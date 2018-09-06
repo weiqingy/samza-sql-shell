@@ -35,6 +35,8 @@ class CliShell {
 
     private boolean m_keepRunning = true;
 
+    private volatile boolean m_executorRunning = false;
+
     public CliShell() {
         // Terminal
         try {
@@ -230,11 +232,19 @@ class CliShell {
         Terminal.SignalHandler handler_INT = m_terminal.handle(Terminal.Signal.INT, this::handleSignal);
         Terminal.SignalHandler handler_QUIT = m_terminal.handle(Terminal.Signal.QUIT, this::handleSignal);;
 
-        SamzaExecutor cliExecutor = new SamzaExecutor();
-        cliExecutor.executeSql(Collections.singletonList(fullCmd));
+        try {
+            SamzaExecutor cliExecutor = new SamzaExecutor();
+            cliExecutor.executeSql(Collections.singletonList(fullCmd));
+            m_executorRunning = true;
+            while(m_executorRunning) {
+                Thread.sleep(50);
+            }
+        } catch(Exception e) {
+            m_terminal.writer().println(e.getMessage());
+        }
 
         m_terminal.handle(Terminal.Signal.INT, handler_INT);
-        m_terminal.handle(Terminal.Signal.INT, handler_QUIT);
+        m_terminal.handle(Terminal.Signal.QUIT, handler_QUIT);
 
         /** Comment out for now; hack for demo
         QueryResult queryResult = m_executor.executeQuery(m_exeContext, command.getFullCommand());
@@ -318,7 +328,10 @@ class CliShell {
         switch (signal) {
             case INT:
             case QUIT:
+                m_terminal.writer().println("Stopping executor");
+                m_terminal.flush();
                 m_executor.stop(m_exeContext);
+                m_executorRunning = false;
                 break;
         }
     }

@@ -27,14 +27,18 @@ public class FakeExecutor implements SqlExecutor {
 
     public List<String> listTables(ExecutionContext context) {
         List<String> tableNames = new ArrayList<String>();
-        tableNames.add("ProfileChangeStream");
+        tableNames.add("kafka.ProfileChangeStream");
 
         return tableNames;
     }
 
     public TableSchema getTableScema(ExecutionContext context, String tableName) {
-        return TableSchemaBuilder.builder().appendColumn("Name", "String")
-                .appendColumn("Age", "Int").toTableSchema();
+        return TableSchemaBuilder.builder().appendColumn("Key", "String")
+                .appendColumn("Name", "String")
+                .appendColumn("NewCompany", "String")
+                .appendColumn("OldCompany", "String")
+                .appendColumn("ProfileChangeTimestamp", "Date")
+                .toTableSchema();
     }
 
 
