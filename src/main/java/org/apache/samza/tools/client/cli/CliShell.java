@@ -29,15 +29,14 @@ class CliShell {
     private final LineReader m_lineReader;
     private final String m_1stPrompt;
     private final SqlExecutor m_executor;
-
     private ExecutionContext m_exeContext;
     private Map<Integer, String> m_executions = new HashMap<>();
 
     private boolean m_keepRunning = true;
 
-    // HACK CODE; REMOVE
+    // TODO: HACK CODE; REMOVE LATER
     private volatile boolean m_executorRunning_TMP = false;
-    private SamzaExecutor m_executor_TMP = new SamzaExecutor();
+
 
     public CliShell() {
         // Terminal
@@ -73,8 +72,7 @@ class CliShell {
 
         // Execution context and executor
         m_exeContext = new ExecutionContext();
-        m_executor_TMP = new SamzaExecutor();
-        m_executor = new FakeExecutor();
+        m_executor = new SamzaExecutor();
         m_executor.start(m_exeContext);
     }
 
@@ -170,7 +168,6 @@ class CliShell {
             }
         }
 
-        // TODO: Clean up. May need to wait for background executions
         m_writer.write("Cleaning up... ");
         m_writer.flush();
         m_executor.stop(m_exeContext);
@@ -190,55 +187,54 @@ class CliShell {
     }
 
     private void commandDescribe(CliCommand command) {
-        TableSchema tableSchema = m_executor.getTableScema(m_exeContext, command.getParameters());
-        if(tableSchema != null) {
-            int count = tableSchema.getColumnCount();
-            for(int i = 0; i < count; ++i) {
-                m_writer.write(tableSchema.getColumnName(i));
-                m_writer.write(CliConstants.SPACE);
-                m_writer.write(tableSchema.getColumTypeName(i));
-                if(i != count - 1)
-                    m_writer.write(",\n");
+        // TODO: Remove the try catch blcok. Executor is not supposed to report error by exceptions
+        try {
+            TableSchema tableSchema = m_executor.getTableScema(m_exeContext, command.getParameters());
+            if (tableSchema != null) {
+                int count = tableSchema.getColumnCount();
+                for (int i = 0; i < count; ++i) {
+                    m_writer.write(tableSchema.getColumnName(i));
+                    m_writer.write(CliConstants.SPACE);
+                    m_writer.write(tableSchema.getColumTypeName(i));
+                    if (i != count - 1)
+                        m_writer.write(",\n");
+                }
+                m_writer.write("\n\n");
+            } else {
+                m_writer.write("Failed to get table schema. Error: ");
+                m_writer.write(m_executor.getErrorMsg());
+                m_writer.write("\n\n");
             }
-            m_writer.write("\n\n");
-        } else {
-            m_writer.write("Failed to get table schema. Error: ");
-            m_writer.write(m_executor.getErrorMsg());
-            m_writer.write("\n\n");
+        } catch(Exception e) {
+            m_terminal.writer().println("Execution error: " + e.getMessage());
+            m_terminal.writer().println("Exception: " + e.getClass().getName());
         }
         m_writer.flush();
     }
 
     private void commandInsertInto(CliCommand command) {
+        // TODO: Remove the try catch blcok. Executor is not supposed to report error by exceptions
         try {
-            int execId = m_executor_TMP.executeSql(
-                Collections.singletonList(command.getFullCommand()));
+            NonQueryResult result = m_executor.executeNonQuery(m_exeContext,
+                    Collections.singletonList(command.getFullCommand()));
 
-            m_writer.write("Execution submitted successfully. Id: ");
-            m_writer.write(String.valueOf(execId));
-            m_writer.println();
-        } catch(Exception e) {
+            if (result.succeeded()) {
+                m_writer.write("Execution submitted successfully. Id: ");
+                m_writer.write(String.valueOf(result.getExecutionId()));
+                m_writer.write("  \n");
+            } else {
+                m_writer.write("Execution failed to submit. Error: ");
+                m_writer.write(m_executor.getErrorMsg());
+                m_writer.println();
+            }
+        }
+        catch(Exception e) {
             m_terminal.writer().println("Execution error: " + e.getMessage());
             m_terminal.writer().println("Exception: " + e.getClass().getName());
         }
         m_writer.println();
         m_writer.flush();
 
-        /*
-        NonQueryResult result = m_executor.executeNonQuery(m_exeContext,
-                Collections.singletonList(command.getFullCommand()));
-
-        if(result.succeeded()) {
-            m_writer.write("Execution submitted successfully. Id: ");
-            m_writer.write(String.valueOf(result.getExecutionId()));
-            m_writer.write("  \n");
-        } else {
-            m_writer.write("Execution failed to submit. Error: ");
-            m_writer.write(m_executor.getErrorMsg());
-            m_writer.write("\n\n");
-        }
-        m_writer.flush();
-        */
     }
 
     private void commandQuit() {
@@ -248,11 +244,14 @@ class CliShell {
     private void commandSelect(CliCommand command) {
         String fullCmd = command.getFullCommand();
 
+        // This code snippet is for temporary select implementation purpose
+        // For now the executor prints out to screen directly which is unacceptable
         Terminal.SignalHandler handler_INT = m_terminal.handle(Terminal.Signal.INT, this::handleSignal);
         Terminal.SignalHandler handler_QUIT = m_terminal.handle(Terminal.Signal.QUIT, this::handleSignal);;
 
+        // TODO: Remove the try catch blcok. Executor is not supposed to report error by exceptions
         try {
-            m_executor_TMP.executeSql(Collections.singletonList(fullCmd));
+            m_executor.executeQuery(m_exeContext, fullCmd);
             m_executorRunning_TMP = true;
             while(m_executorRunning_TMP) {
                 Thread.sleep(50);
@@ -265,7 +264,7 @@ class CliShell {
         m_terminal.handle(Terminal.Signal.INT, handler_INT);
         m_terminal.handle(Terminal.Signal.QUIT, handler_QUIT);
 
-        /** Comment out for now; hack for demo
+        /** REAL CODE
         QueryResult queryResult = m_executor.executeQuery(m_exeContext, command.getFullCommand());
         m_executions.put(queryResult.getExecutionId(), fullCmd);
 
@@ -347,7 +346,7 @@ class CliShell {
         switch (signal) {
             case INT:
             case QUIT:
-                m_executor_TMP.stop(m_exeContext);
+                m_executor.stop(m_exeContext);
                 m_terminal.writer().println("User cancelled query. \n");
                 m_terminal.flush();
                 m_executorRunning_TMP = false;

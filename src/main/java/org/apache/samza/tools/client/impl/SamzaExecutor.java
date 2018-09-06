@@ -115,7 +115,8 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public NonQueryResult executeNonQuery(ExecutionContext context, List<String> statement) {
-        throw new ExecutionException("not supported");
+        int execId = executeSql(statement);
+        return new NonQueryResult(execId, true);
     }
 
     @Override
