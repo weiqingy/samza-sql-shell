@@ -3,6 +3,7 @@ package org.apache.samza.tools.client.impl;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -29,6 +30,7 @@ import org.apache.samza.standalone.PassthroughJobCoordinatorFactory;
 import org.apache.samza.system.kafka.KafkaSystemFactory;
 import org.apache.samza.tools.avro.AvroSchemaGenRelConverterFactory;
 import org.apache.samza.tools.avro.AvroSerDeFactory;
+import org.apache.samza.tools.client.interfaces.ExecutionContext;
 import org.apache.samza.tools.client.interfaces.ExecutionStatus;
 import org.apache.samza.tools.client.interfaces.NonQueryResult;
 import org.apache.samza.tools.client.interfaces.QueryResult;
@@ -70,9 +72,15 @@ public class SamzaExecutor {//implements SqlExecutor{
     // -- implementation of SqlExecutor ------------------------------------------
 
     public void start() {
+
     }
 
-    public void stop() {
+    public void stop(ExecutionContext context) {
+        Iterator it = m_executors.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry pair = (Map.Entry)it.next();
+            stopExecution(Integer.valueOf((Integer) pair.getKey()));
+        }
     }
 
     public List<String> showTables() {
