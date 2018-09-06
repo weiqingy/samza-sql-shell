@@ -31,9 +31,12 @@ import org.apache.samza.system.kafka.KafkaSystemFactory;
 import org.apache.samza.tools.avro.AvroSchemaGenRelConverterFactory;
 import org.apache.samza.tools.avro.AvroSerDeFactory;
 import org.apache.samza.tools.client.interfaces.ExecutionContext;
+import org.apache.samza.tools.client.interfaces.ExecutionException;
 import org.apache.samza.tools.client.interfaces.ExecutionStatus;
 import org.apache.samza.tools.client.interfaces.NonQueryResult;
 import org.apache.samza.tools.client.interfaces.QueryResult;
+import org.apache.samza.tools.client.interfaces.SqlExecutor;
+import org.apache.samza.tools.client.interfaces.TableSchema;
 import org.apache.samza.tools.json.JsonRelConverterFactory;
 import org.apache.samza.tools.schemas.PageViewEvent;
 import org.apache.samza.tools.schemas.ProfileChangeEvent;
@@ -44,7 +47,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SamzaExecutor {//implements SqlExecutor{
+public class SamzaExecutor implements SqlExecutor {
     private static final Logger LOG = LoggerFactory.getLogger(SamzaExecutor.class);
     private static final String SAMZA_SYSTEM_KAFKA = "kafka";
     private static final String SAMZA_SYSTEM_LOG = "log";
@@ -71,10 +74,12 @@ public class SamzaExecutor {//implements SqlExecutor{
 
     // -- implementation of SqlExecutor ------------------------------------------
 
-    public void start() {
+    @Override
+    public void start(ExecutionContext context) {
 
     }
 
+    @Override
     public void stop(ExecutionContext context) {
         Iterator it = m_executors.entrySet().iterator();
         while (it.hasNext()) {
@@ -83,37 +88,66 @@ public class SamzaExecutor {//implements SqlExecutor{
         }
     }
 
-    public List<String> showTables() {
-        return null;
+    @Override
+    public List<String> listTables(ExecutionContext context) {
+        throw new ExecutionException("not supported");
     }
 
-    public QueryResult executeQuery(String statement) {
-        executeSql(Collections.singletonList(statement));
-        // TODO: Return a QueryResult with Schema
-//        SamzaSqlApplicationConfig sqlConfig = new SamzaSqlApplicationConfig(config);
-
-
-        return null;
+    @Override
+    public TableSchema getTableScema(ExecutionContext context, String tableName) {
+        throw new ExecutionException("not supported");
     }
 
-    public NonQueryResult executeNonQuery(List<String> statement) {
-        return null;
+    @Override
+    public QueryResult executeQuery(ExecutionContext context, String statement) {
+        return executeQuery(statement);
     }
 
+    @Override
+    public int getRowCount() {
+        throw new ExecutionException("not supported");
+    }
+
+    @Override
+    public List<String[]> retrieveQueryResult(ExecutionContext context, int startRow, int endRow) {
+        throw new ExecutionException("not supported");
+    }
+
+    @Override
+    public NonQueryResult executeNonQuery(ExecutionContext context, List<String> statement) {
+        throw new ExecutionException("not supported");
+    }
+
+    @Override
+    public boolean stopExecution(ExecutionContext context, int exeId) {
+        return stopExecution(exeId);
+    }
+
+    @Override
+    public boolean removeExecution(ExecutionContext context, int exeId) {
+        throw new ExecutionException("not supported");
+    }
+
+    @Override
     public ExecutionStatus queryExecutionStatus(int execId) {
         if (!m_executors.containsKey(execId)) {
             return null;
         }
-
         return m_executors.get(execId).status;
     }
 
-    public boolean stopExecution(int execId) {
-        SamzaExecution exec = m_executors.get(execId);
+    @Override
+    public String getErrorMsg() {
+        throw new ExecutionException("not supported");
+    }
+
+
+    public boolean stopExecution(int exeId) {
+        SamzaExecution exec = m_executors.get(exeId);
         if(exec != null) {
             exec.runner.kill(exec.app);
-            m_executors.remove(execId);
-            LOG.debug("Stopping execution ", execId);
+            m_executors.remove(exeId);
+            LOG.debug("Stopping execution ", exeId);
 
             try {
                 Thread.sleep(500); // wait for a second
@@ -123,10 +157,25 @@ public class SamzaExecutor {//implements SqlExecutor{
 
             return true;
         } else {
-            LOG.warn("Trying to stop a non-existing SQL execution ", execId);
+            LOG.warn("Trying to stop a non-existing SQL execution ", exeId);
             return false;
         }
     }
+
+    public QueryResult executeQuery(String statement) {
+        executeSql(Collections.singletonList(statement));
+        // TODO: Return a QueryResult with Schema
+        //  SamzaSqlApplicationConfig sqlConfig = new SamzaSqlApplicationConfig(config);
+
+        return null;
+    }
+
+    public NonQueryResult executeNonQuery(List<String> statement) {
+        return null;
+    }
+
+
+    
 
     // ------------------------------------------------------------------------
 
@@ -238,6 +287,14 @@ public class SamzaExecutor {//implements SqlExecutor{
         staticConfigs.put(
                 configAvroRelSchemaProviderDomain + String.format(ConfigBasedAvroRelSchemaProviderFactory.CFG_SOURCE_SCHEMA,
                         "kafka", "ProfileChangeStream"), ProfileChangeEvent.SCHEMA$.toString());
+
+        staticConfigs.put(
+            configAvroRelSchemaProviderDomain + String.format(ConfigBasedAvroRelSchemaProviderFactory.CFG_SOURCE_SCHEMA,
+                "kafka", "ProfileChangeStream1"), ProfileChangeEvent.SCHEMA$.toString());
+
+        staticConfigs.put(
+            configAvroRelSchemaProviderDomain + String.format(ConfigBasedAvroRelSchemaProviderFactory.CFG_SOURCE_SCHEMA,
+                "kafka", "ProfileChangeStream_sink"), ProfileChangeEvent.SCHEMA$.toString());
 
         return staticConfigs;
     }
