@@ -210,6 +210,20 @@ class CliShell {
     }
 
     private void commandInsertInto(CliCommand command) {
+        try {
+            int execId = m_executor_TMP.executeSql(
+                Collections.singletonList(command.getFullCommand()));
+
+            m_writer.write("Execution submitted successfully. Id: ");
+            m_writer.write(String.valueOf(execId));
+            m_writer.println();
+        } catch(Exception e) {
+            m_terminal.writer().println(e.getMessage());
+        }
+        m_writer.println();
+        m_writer.flush();
+
+        /*
         NonQueryResult result = m_executor.executeNonQuery(m_exeContext,
                 Collections.singletonList(command.getFullCommand()));
 
@@ -223,6 +237,7 @@ class CliShell {
             m_writer.write("\n\n");
         }
         m_writer.flush();
+        */
     }
 
     private void commandQuit() {
