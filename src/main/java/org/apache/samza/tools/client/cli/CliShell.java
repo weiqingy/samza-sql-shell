@@ -35,7 +35,9 @@ class CliShell {
 
     private boolean m_keepRunning = true;
 
-    private volatile boolean m_executorRunning = false;
+    // HACK CODE; REMOVE
+    private volatile boolean m_executorRunning_TMP = false;
+    private SamzaExecutor m_executor_TMP = new SamzaExecutor();
 
     public CliShell() {
         // Terminal
@@ -71,6 +73,7 @@ class CliShell {
 
         // Execution context and executor
         m_exeContext = new ExecutionContext();
+        m_executor_TMP = new SamzaExecutor();
         m_executor = new FakeExecutor();
         m_executor.start(m_exeContext);
     }
@@ -233,10 +236,9 @@ class CliShell {
         Terminal.SignalHandler handler_QUIT = m_terminal.handle(Terminal.Signal.QUIT, this::handleSignal);;
 
         try {
-            SamzaExecutor cliExecutor = new SamzaExecutor();
-            cliExecutor.executeSql(Collections.singletonList(fullCmd));
-            m_executorRunning = true;
-            while(m_executorRunning) {
+            m_executor_TMP.executeSql(Collections.singletonList(fullCmd));
+            m_executorRunning_TMP = true;
+            while(m_executorRunning_TMP) {
                 Thread.sleep(50);
             }
         } catch(Exception e) {
@@ -328,10 +330,10 @@ class CliShell {
         switch (signal) {
             case INT:
             case QUIT:
-                m_terminal.writer().println("Stopping executor");
+                m_executor_TMP.stop(m_exeContext);
+                m_terminal.writer().println("User cancelled query. \n");
                 m_terminal.flush();
-                m_executor.stop(m_exeContext);
-                m_executorRunning = false;
+                m_executorRunning_TMP = false;
                 break;
         }
     }

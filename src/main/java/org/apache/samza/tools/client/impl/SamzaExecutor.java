@@ -114,6 +114,13 @@ public class SamzaExecutor {//implements SqlExecutor{
             exec.runner.kill(exec.app);
             m_executors.remove(execId);
             LOG.debug("Stopping execution ", execId);
+
+            try {
+                Thread.sleep(500); // wait for a second
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
             return true;
         } else {
             LOG.warn("Trying to stop a non-existing SQL execution ", execId);
@@ -131,6 +138,7 @@ public class SamzaExecutor {//implements SqlExecutor{
 
 
     public int executeSql(List<String> sqlStmts) {
+
         sqlStmts = sqlStmts.stream().map(sql -> {
             if (!sql.toLowerCase().startsWith("insert")) {
                 String formattedSql = String.format("insert into log.outputStream %s", sql);
