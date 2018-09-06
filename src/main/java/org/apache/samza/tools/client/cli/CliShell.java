@@ -219,6 +219,7 @@ class CliShell {
             m_writer.println();
         } catch(Exception e) {
             m_terminal.writer().println("Execution error: " + e.getMessage());
+            m_terminal.writer().println("Exception: " + e.getClass().getName());
         }
         m_writer.println();
         m_writer.flush();
@@ -258,6 +259,7 @@ class CliShell {
             }
         } catch(Exception e) {
             m_terminal.writer().println("Execution error: " + e.getMessage());
+            m_terminal.writer().println("Exception: " + e.getClass().getName());
         }
 
         m_terminal.handle(Terminal.Signal.INT, handler_INT);
