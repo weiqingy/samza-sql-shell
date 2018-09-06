@@ -1,11 +1,7 @@
 package org.apache.samza.tools.client.impl;
 
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -30,13 +26,7 @@ import org.apache.samza.standalone.PassthroughJobCoordinatorFactory;
 import org.apache.samza.system.kafka.KafkaSystemFactory;
 import org.apache.samza.tools.avro.AvroSchemaGenRelConverterFactory;
 import org.apache.samza.tools.avro.AvroSerDeFactory;
-import org.apache.samza.tools.client.interfaces.ExecutionContext;
-import org.apache.samza.tools.client.interfaces.ExecutionException;
-import org.apache.samza.tools.client.interfaces.ExecutionStatus;
-import org.apache.samza.tools.client.interfaces.NonQueryResult;
-import org.apache.samza.tools.client.interfaces.QueryResult;
-import org.apache.samza.tools.client.interfaces.SqlExecutor;
-import org.apache.samza.tools.client.interfaces.TableSchema;
+import org.apache.samza.tools.client.interfaces.*;
 import org.apache.samza.tools.json.JsonRelConverterFactory;
 import org.apache.samza.tools.schemas.PageViewEvent;
 import org.apache.samza.tools.schemas.ProfileChangeEvent;
@@ -90,12 +80,20 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public List<String> listTables(ExecutionContext context) {
-        throw new ExecutionException("not supported");
+        List<String> tableNames = new ArrayList<String>();
+        tableNames.add("kafka.ProfileChangeStream");
+
+        return tableNames;
     }
 
     @Override
     public TableSchema getTableScema(ExecutionContext context, String tableName) {
-        throw new ExecutionException("not supported");
+        return TableSchemaBuilder.builder().appendColumn("Key", "String")
+                .appendColumn("Name", "String")
+                .appendColumn("NewCompany", "String")
+                .appendColumn("OldCompany", "String")
+                .appendColumn("ProfileChangeTimestamp", "Date")
+                .toTableSchema();
     }
 
     @Override
@@ -164,11 +162,12 @@ public class SamzaExecutor implements SqlExecutor {
     }
 
     public QueryResult executeQuery(String statement) {
-        executeSql(Collections.singletonList(statement));
-        // TODO: Return a QueryResult with Schema
-        //  SamzaSqlApplicationConfig sqlConfig = new SamzaSqlApplicationConfig(config);
+        int execId = executeSql(Collections.singletonList(statement));
 
-        return null;
+        TableSchema schema = TableSchemaBuilder.builder().
+                appendColumn("All", "String").toTableSchema();
+
+        return new QueryResult(1, schema);
     }
 
     public NonQueryResult executeNonQuery(List<String> statement) {
