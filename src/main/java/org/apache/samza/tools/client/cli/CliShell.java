@@ -1,6 +1,7 @@
 package org.apache.samza.tools.client.cli;
 
 import org.apache.samza.tools.client.impl.FakeExecutor;
+import org.apache.samza.tools.client.impl.SamzaExecutor;
 import org.apache.samza.tools.client.interfaces.*;
 import org.apache.samza.tools.client.util.CliException;
 import org.apache.samza.tools.client.util.CliUtil;
@@ -225,11 +226,23 @@ class CliShell {
 
     private void commandSelect(CliCommand command) {
         String fullCmd = command.getFullCommand();
+
+        Terminal.SignalHandler handler_INT = m_terminal.handle(Terminal.Signal.INT, this::handleSignal);
+        Terminal.SignalHandler handler_QUIT = m_terminal.handle(Terminal.Signal.QUIT, this::handleSignal);;
+
+        SamzaExecutor cliExecutor = new SamzaExecutor();
+        cliExecutor.executeSql(Collections.singletonList(fullCmd));
+
+        m_terminal.handle(Terminal.Signal.INT, handler_INT);
+        m_terminal.handle(Terminal.Signal.INT, handler_QUIT);
+
+        /** Comment out for now; hack for demo
         QueryResult queryResult = m_executor.executeQuery(m_exeContext, command.getFullCommand());
         m_executions.put(queryResult.getExecutionId(), fullCmd);
 
         CliView view = new QueryResultExpendedLogView();
         view.open(this, queryResult);
+         */
     }
 
     private void commandShowTables(CliCommand command) {
@@ -297,5 +310,16 @@ class CliShell {
 
     private void clearScreen() {
         m_terminal.puts(InfoCmp.Capability.clear_screen);
+    }
+
+
+    // TODO: REMOVE LATER; Hack for temp select execution
+    private void handleSignal(Terminal.Signal signal) {
+        switch (signal) {
+            case INT:
+            case QUIT:
+                m_executor.stop(m_exeContext);
+                break;
+        }
     }
 }

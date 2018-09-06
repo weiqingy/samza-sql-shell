@@ -5,6 +5,8 @@ import org.apache.samza.tools.client.interfaces.QueryResult;
 import org.apache.samza.tools.client.interfaces.SqlExecutor;
 import org.jline.reader.UserInterruptException;
 import org.jline.terminal.Attributes;
+import org.jline.terminal.Cursor;
+import org.jline.terminal.Size;
 import org.jline.terminal.Terminal;
 import org.jline.utils.InfoCmp;
 
@@ -59,7 +61,6 @@ public class QueryResultExpendedLogView implements CliView {
             }
         }
         m_terminal.puts(InfoCmp.Capability.exit_ca_mode);
-        m_terminal.puts(InfoCmp.Capability.keypad_local);
         m_terminal.puts(InfoCmp.Capability.cursor_visible);
     }
 
@@ -67,20 +68,22 @@ public class QueryResultExpendedLogView implements CliView {
 
 
     public void display() {
-        // tput smcup; use alternate screen
-        m_terminal.puts(InfoCmp.Capability.enter_ca_mode);
-        m_terminal.puts(InfoCmp.Capability.keypad_xmit);
-        m_terminal.puts(InfoCmp.Capability.cursor_invisible);
 
-        enterFreePaintMode();
+
+        setupTerminal();
     }
 
     public void refresh() {
          m_terminal.writer().flush();
     }
 
-    private void enterFreePaintMode() {
-        m_terminal.enterRawMode();
+    private TerminalStatus setupTerminal() {
+        TerminalStatus prevStatus = new TerminalStatus();
+
+        // tput smcup; use alternate screen
+        m_terminal.puts(InfoCmp.Capability.enter_ca_mode);
+        m_terminal.puts(InfoCmp.Capability.cursor_invisible);
+
 
         Attributes attributes = new Attributes(m_terminal.getAttributes());
  //       attributes.setControlChar(Attributes.ControlChar.VINTR, 0);
@@ -89,6 +92,12 @@ public class QueryResultExpendedLogView implements CliView {
         m_terminal.handle(Terminal.Signal.INT, this::handleSignal);
         m_terminal.handle(Terminal.Signal.QUIT, this::handleSignal);
         m_terminal.handle(Terminal.Signal.WINCH, this::handleSignal);
+
+        return prevStatus;
+    }
+
+    private void restoreTerminal(TerminalStatus status) {
+
     }
 
     private void handleSignal(Terminal.Signal signal) {
@@ -101,5 +110,11 @@ public class QueryResultExpendedLogView implements CliView {
                 // TODO: Window resize
                 break;
         }
+    }
+
+    private static class TerminalStatus {
+        Terminal.SignalHandler handler_INT;
+        Terminal.SignalHandler handler_QUIT;
+        Terminal.SignalHandler handler_WINCH;
     }
 }
