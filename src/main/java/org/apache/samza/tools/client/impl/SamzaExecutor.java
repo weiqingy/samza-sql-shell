@@ -98,7 +98,12 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public QueryResult executeQuery(ExecutionContext context, String statement) {
-        return executeQuery(statement);
+        int execId = executeSql(Collections.singletonList(statement));
+
+        TableSchema schema = TableSchemaBuilder.builder().
+                appendColumn("All", "String").toTableSchema();
+
+        return new QueryResult(1, schema);
     }
 
     @Override
@@ -161,21 +166,11 @@ public class SamzaExecutor implements SqlExecutor {
         }
     }
 
-    public QueryResult executeQuery(String statement) {
-        int execId = executeSql(Collections.singletonList(statement));
-
-        TableSchema schema = TableSchemaBuilder.builder().
-                appendColumn("All", "String").toTableSchema();
-
-        return new QueryResult(1, schema);
-    }
-
     public NonQueryResult executeNonQuery(List<String> statement) {
-        return null;
+        int execId = executeSql(statement);
+        return new NonQueryResult(execId, true);
     }
 
-
-    
 
     // ------------------------------------------------------------------------
 
