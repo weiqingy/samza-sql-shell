@@ -52,9 +52,8 @@ public class QueryResultExpendedLogView implements CliView {
 
         while(m_keepRunning) {
             try {
-                refresh();
-
                 Thread.sleep(m_refreshInterval);
+                refresh();
             } catch (InterruptedException e) {
                 continue;
             }
@@ -81,17 +80,13 @@ public class QueryResultExpendedLogView implements CliView {
     }
 
     private void enterFreePaintMode() {
-//        Attributes attributes = new Attributes(m_terminal.getAttributes());
-//        attributes.setLocalFlags(EnumSet.of(Attributes.LocalFlag.ICANON, Attributes.LocalFlag.ECHO, Attributes.LocalFlag.IEXTEN), false);
-//        attributes.setInputFlags(EnumSet.of(Attributes.InputFlag.IXON, Attributes.InputFlag.ICRNL, Attributes.InputFlag.INLCR), false);
-//        attributes.setControlChar(Attributes.ControlChar.VMIN, 1);
-//        attributes.setControlChar(Attributes.ControlChar.VTIME, 0);
-//        attributes.setControlChar(Attributes.ControlChar.VINTR, 0);
-//        m_terminal.setAttributes(attributes);
+        Attributes attributes = new Attributes(m_terminal.getAttributes());
+ //       attributes.setControlChar(Attributes.ControlChar.VINTR, 0);
+        m_terminal.setAttributes(attributes);
 
-//        m_terminal.handle(Terminal.Signal.INT, this::handleSignal);
-//        m_terminal.handle(Terminal.Signal.QUIT, this::handleSignal);
-//        m_terminal.handle(Terminal.Signal.WINCH, this::handleSignal);
+        m_terminal.handle(Terminal.Signal.INT, this::handleSignal);
+        m_terminal.handle(Terminal.Signal.QUIT, this::handleSignal);
+        m_terminal.handle(Terminal.Signal.WINCH, this::handleSignal);
     }
 
     private void handleSignal(Terminal.Signal signal) {
