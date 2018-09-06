@@ -80,6 +80,8 @@ public class QueryResultExpendedLogView implements CliView {
     }
 
     private void enterFreePaintMode() {
+        m_terminal.enterRawMode();
+
         Attributes attributes = new Attributes(m_terminal.getAttributes());
  //       attributes.setControlChar(Attributes.ControlChar.VINTR, 0);
         m_terminal.setAttributes(attributes);

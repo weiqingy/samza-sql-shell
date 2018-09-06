@@ -15,6 +15,7 @@ enum CliCommandType {
     INSERT_INTO     ("INSERT INTO", "Executes a SQL INSERT INTO."),
     HELP            ("HELP", "\tDisplays this help message."),
     SELECT          ("SELECT", "\tExecutes a SQL SELECT query."),
+    SET             ("SET", "\tSets a variable."),
     SHOW_TABLES     ("SHOW TABLES", "Shows all available tables."),
     QUIT            ("QUIT", "\tQuits the shell."),
 

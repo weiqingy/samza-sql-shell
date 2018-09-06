@@ -18,6 +18,17 @@ import java.util.List;
  *  executor shall keep record of all the execution unless being asked to remove them (
  *  when removeExecution is called.)
  *
+ * IMPORT: An executor shall support two ways of supplying data:
+ * 1. Say user selects profiles of users who visited LinkedIn in the last 5 mins. There could
+ *    be millions of rows, but the UI only need to show a small fraction. That's retrieveQueryResult,
+ *    accepting a row range (startRow and endRow). Note that UI may ask for the same data over and over,
+ *    like when user switches from pange 1 to page 2 and data stream changes at the same time, the two
+ *    pages may actually have overlapped or even same data.
+ *
+ * 2. Say user wants to see clicks on a LinkedIn page of certain person from now on. In this mode
+ *    consumeQueryResult shall be used. UI can keep asking for new rows, and once the rows are consumed,
+ *    it's no longer necessary for the executor to keep them. If lots of rows come in, the UI may be only
+ *    interested in the last certain rows (as it's in a logview mode), so all data older can be dropped.
  *
  */
 public interface SqlExecutor {
