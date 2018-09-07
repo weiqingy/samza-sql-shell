@@ -16,7 +16,6 @@ import org.apache.samza.sql.fn.FlattenUdf;
 import org.apache.samza.sql.fn.RegexMatchUdf;
 import org.apache.samza.sql.impl.ConfigBasedIOResolverFactory;
 import org.apache.samza.sql.impl.ConfigBasedUdfResolver;
-import org.apache.samza.sql.interfaces.RelSchemaProvider;
 import org.apache.samza.sql.interfaces.SqlIOConfig;
 import org.apache.samza.sql.runner.SamzaSqlApplication;
 import org.apache.samza.sql.runner.SamzaSqlApplicationConfig;
@@ -30,11 +29,9 @@ import org.apache.samza.tools.client.interfaces.*;
 import org.apache.samza.tools.json.JsonRelConverterFactory;
 import org.apache.samza.tools.schemas.PageViewEvent;
 import org.apache.samza.tools.schemas.ProfileChangeEvent;
-
-import com.google.common.base.Joiner;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.base.Joiner;
 
 
 public class SamzaExecutor implements SqlExecutor {
@@ -71,10 +68,8 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public void stop(ExecutionContext context) {
-        Iterator it = m_executors.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry pair = (Map.Entry)it.next();
-            stopExecution(Integer.valueOf((Integer) pair.getKey()));
+        for (int execId : m_executors.keySet()) {
+            stopExecution(execId);
         }
     }
 
@@ -145,8 +140,37 @@ public class SamzaExecutor implements SqlExecutor {
         throw new ExecutionException("not supported");
     }
 
+    // ------------------------------------------------------------------------
+    /*private int executeSqlFile(String sqlFile) {
+          List<String> sqlStmts = SqlFileParser.parseSqlFile(sqlFile);
+          return executeSql(sqlStmts);
+     }*/
 
-    public boolean stopExecution(int exeId) {
+     private int executeSql(List<String> sqlStmts) {
+        sqlStmts = sqlStmts.stream().map(sql -> {
+            if (!sql.toLowerCase().startsWith("insert")) {
+                String formattedSql = String.format("insert into log.outputStream %s", sql);
+                LOG.debug("Sql formatted. ", sql, formattedSql);
+                return formattedSql;
+            } else {
+                return sql;
+            }
+        }).collect(Collectors.toList());
+
+        int execId = m_execIdSeq.incrementAndGet();
+        Map<String, String> staticConfigs = fetchSamzaSqlConfig(execId);
+        staticConfigs.put(SamzaSqlApplicationConfig.CFG_SQL_STMTS_JSON, JsonUtil.toJson(sqlStmts));
+
+        SamzaSqlApplicationRunner runner = new SamzaSqlApplicationRunner(true, new MapConfig(staticConfigs));
+        SamzaSqlApplication app = new SamzaSqlApplication();
+        runner.run(app);
+
+        m_executors.put(execId, new SamzaExecution(runner, app));
+        LOG.debug("Executing sql. Id ", execId);
+        return execId;
+    }
+
+    private boolean stopExecution(int exeId) {
         SamzaExecution exec = m_executors.get(exeId);
         if(exec != null) {
             exec.runner.kill(exec.app);
@@ -165,51 +189,6 @@ public class SamzaExecutor implements SqlExecutor {
             return false;
         }
     }
-
-    public NonQueryResult executeNonQuery(List<String> statement) {
-        int execId = executeSql(statement);
-        return new NonQueryResult(execId, true);
-    }
-
-
-    // ------------------------------------------------------------------------
-
-//    private int executeSqlFile(String sqlFile) {
-//        List<String> sqlStmts = SqlFileParser.parseSqlFile(sqlFile);
-//        return executeSql(sqlStmts);
-//    }
-
-
-
-    public int executeSql(List<String> sqlStmts) {
-
-        sqlStmts = sqlStmts.stream().map(sql -> {
-            if (!sql.toLowerCase().startsWith("insert")) {
-                String formattedSql = String.format("insert into log.outputStream %s", sql);
-                LOG.debug("Sql formatted. ", sql, formattedSql);
-                return formattedSql;
-            } else {
-                return sql;
-            }
-        }).collect(Collectors.toList());
-
-        int execId = m_execIdSeq.incrementAndGet();
-        Map<String, String> staticConfigs = fetchSamzaSqlConfig(execId);
-        staticConfigs.put(SamzaSqlApplicationConfig.CFG_SQL_STMTS_JSON, JsonUtil.toJson(sqlStmts));
-
-        SamzaSqlApplicationConfig sqlConfig = new SamzaSqlApplicationConfig(new MapConfig(staticConfigs));
-        Map<String, RelSchemaProvider> relSchemaProviders = sqlConfig.getRelSchemaProviders();
-
-        SamzaSqlApplicationRunner runner = new SamzaSqlApplicationRunner(true, new MapConfig(staticConfigs));
-        SamzaSqlApplication app = new SamzaSqlApplication();
-        runner.run(app);
-
-        m_executors.put(execId, new SamzaExecution(runner, app));
-        LOG.debug("Executing sql. Id ", execId);
-        return execId;
-    }
-
-
 
     private static Map<String, String> fetchSamzaSqlConfig(int execId) {
         HashMap<String, String> staticConfigs = new HashMap<>();

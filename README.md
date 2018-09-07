@@ -22,6 +22,21 @@ Currently SamzaSQL shell depends on Samza version [0.14.1](http://samza.apache.o
 
 ## Populate data
 
+### Set up Kafka cluster
+This is [Kafka quick start](http://kafka.apache.org/quickstart).
+#### start Zookeeper
+    bin/zookeeper-server-start.sh config/zookeeper.properties
+
+#### Start Kafka server
+    bin/kafka-server-start.sh config/server.properties
+
+#### List existing topics
+    bin/kafka-topics.sh --list --zookeeper localhost:2181
+
+#### Use Kafka tool to create Kafka topics
+    ./bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic ProfileChangeStream
+    ./bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic ProfileChangeStream_sink
+
 ### Download Samza tool and use it to generate data
 For example, you can use [samza-tools-0.14.1](http://samza.apache.org/startup/download/) to generate data for Kafka topics like “ProfileChangeStream”.
 
@@ -37,4 +52,4 @@ Input your SQL statements in the shell:
 
     select * from kafka.ProfileChangeStream
     insert into kafka.ProfileChangeStream_sink select * from kafka.ProfileChangeStream
-    select * from kafka.ProfileChangeStream1
+    select * from kafka.ProfileChangeStream_sink
