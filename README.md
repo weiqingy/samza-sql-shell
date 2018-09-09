@@ -18,13 +18,16 @@ Currently SamzaSQL shell depends on Samza version [0.14.1](http://samza.apache.o
 
 ### Build SamzaSQL shell
     git clone https://github.com/weiqingy/samza-sql-shell.git 
-    mvn package
+    mvn clean package
+mvn package with "-Passembly" will assemble all the required dependencies and packages into an assembly jar.
+
+    mvn clean package -Passembly
 
 ## Populate data
 
 ### Set up Kafka cluster
 This is [Kafka quick start](http://kafka.apache.org/quickstart).
-#### start Zookeeper
+#### Start Zookeeper
     bin/zookeeper-server-start.sh config/zookeeper.properties
 
 #### Start Kafka server
@@ -44,9 +47,9 @@ For example, you can use [samza-tools-0.14.1](http://samza.apache.org/startup/do
     ./scripts/generate-kafka-events.sh -t ProfileChangeStream -e ProfileChange
 
 ## Run SamzaSQL shell
-We'll enable users to build a fat jar, then Samza libraries "samza-tools-0.14.1/lib/*" do not need to be included in classpath. 
+Include samza-sql-shell assembly jar in classpath. 
 
-    java -Dlog4j.configuration=file:samza-sql-shell/src/main/resources/log4j.xml -cp samza-tools-0.14.1/lib/*:samza-sql-shell/target/samza-sql-shell-1.0-SNAPSHOT-jar-with-dependencies.jar org.apache.samza.tools.client.cli.Main
+    java -Dlog4j.configuration=file:samza-sql-shell/src/main/resources/log4j.xml -cp samza-sql-shell/target/samza-sql-shell-1.0-SNAPSHOT-jar-with-dependencies.jar org.apache.samza.tools.client.cli.Main
     
 Input your SQL statements in the shell:
 
