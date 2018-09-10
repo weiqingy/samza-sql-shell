@@ -60,23 +60,25 @@ public class QueryResultExpendedLogView implements CliView {
         m_executor = shell.getExecutor();
         m_exeContext = shell.getExecutionContext();
 
-
-
         TerminalStatus prevStatus = setupTerminal();
-        updateTerminalSize();
-        m_keyReader = new BindingReader(m_terminal.reader());
-        m_inputThread = new InputThread();
-        m_inputThread.start();
-        while(m_keepRunning) {
-            try {
-                display();
-                Thread.sleep(m_refreshInterval);
-            } catch (InterruptedException e) {
-                continue;
-            }
-        }
+        try {
 
-        restoreTerminal(prevStatus);
+            updateTerminalSize();
+            m_keyReader = new BindingReader(m_terminal.reader());
+            m_inputThread = new InputThread();
+            m_inputThread.start();
+            while (m_keepRunning) {
+                try {
+                    display();
+                    Thread.sleep(m_refreshInterval);
+                } catch (InterruptedException e) {
+                    continue;
+                }
+            }
+
+        } finally {
+            restoreTerminal(prevStatus);
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -162,7 +164,7 @@ public class QueryResultExpendedLogView implements CliView {
         // (003, ETX, Ctrl-C, or also 0177, DEL, rubout) Interrupt char‐
         // acter (INTR).  Send a SIGINT signal.  Recognized when ISIG is
         // set, and then not passed as input.
- //       newAttributes.setControlChar(Attributes.ControlChar.VINTR, 1);
+        newAttributes.setControlChar(Attributes.ControlChar.VINTR, 0);
         // (034, FS, Ctrl-\) Quit character (QUIT).  Send SIGQUIT signal.
         // Recognized when ISIG is set, and then not passed as input.
 //        newAttributes.setControlChar(Attributes.ControlChar.VQUIT, 0);
@@ -212,7 +214,7 @@ public class QueryResultExpendedLogView implements CliView {
         switch (signal) {
             case INT:
             case QUIT:
-                m_keepRunning = false;
+//                m_keepRunning = false;
                 break;
             case TSTP:
                 // Pause
@@ -263,7 +265,7 @@ public class QueryResultExpendedLogView implements CliView {
             KeyMap<Action> keyMap = bindActionKey();
 
             Action action = m_keyReader.readBinding(keyMap, null, true);
-            while (action != null) {
+            while (action != null && m_keepRunning) {
                 switch (action) {
                     case QUIT:
                         m_keepRunning = false;
@@ -275,6 +277,5 @@ public class QueryResultExpendedLogView implements CliView {
                 action = m_keyReader.readBinding(keyMap, null, true);
             }
         }
-
     }
 }

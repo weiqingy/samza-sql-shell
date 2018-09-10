@@ -39,14 +39,14 @@ public class RandomAccessQueueTest {
   public void testGetRange() {
     _queue.clear();
     for (int i = 0; i < 4; i++) {
-      _queue.add(i);
+      _queue.add(i); // 0, 1, 2, 3
     }
     List<Integer> rets = _queue.get(-1, 9);
     Assert.assertEquals(4, rets.size());
     Assert.assertEquals(0, _queue.get(0));
     Assert.assertEquals(3, _queue.get(3));
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i <= 2; i++) {
       _queue.add(4 + i);
     }
     rets = _queue.get(0, 4);

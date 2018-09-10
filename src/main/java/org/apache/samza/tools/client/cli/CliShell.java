@@ -273,7 +273,7 @@ class CliShell {
             view.open(this, queryResult);
         } catch (SamzaException e) {
             m_writer.write("Failed to query. Error: ");
-            m_writer.write(m_executor.getErrorMsg());
+            m_writer.write(e.getMessage());
             m_writer.write("\n\n");
         }
 

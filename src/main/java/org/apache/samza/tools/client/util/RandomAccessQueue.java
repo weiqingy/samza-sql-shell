@@ -39,12 +39,13 @@ public class RandomAccessQueue<T> {
   }
 
   public synchronized void add(T t) {
-    if (m_size < m_capacity) {
-      m_buffer[m_size] = t;
-      m_size++;
-    } else {
+    if (m_size >= m_capacity) {
       m_buffer[m_head] = t;
       m_head = (m_head + 1) % m_capacity;
+    } else {
+      int pos = (m_head + m_size) % m_capacity;
+      m_buffer[pos] = t;
+      m_size++;
     }
   }
 
@@ -53,8 +54,10 @@ public class RandomAccessQueue<T> {
    */
    public synchronized List<T> consume(int start, int end) {
      List<T> rets = get(start, end);
+     int lowerBound = Math.max(start, 0);
+     int upperBound = Math.min(end, m_size - 1);
      m_head = (end + 1) % m_capacity;
-     m_size -= end + 1;
+     m_size -= (upperBound + 1);
      return rets;
    }
 
