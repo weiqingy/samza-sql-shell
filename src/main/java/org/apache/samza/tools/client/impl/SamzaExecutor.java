@@ -127,8 +127,7 @@ public class SamzaExecutor implements SqlExecutor {
     public List<String[]> retrieveQueryResult(ExecutionContext context, int startRow, int endRow) {
         List<String[]> results = new ArrayList<>();
         for (OutgoingMessageEnvelope row : outputData.get(startRow, endRow)) {
-            String[] formattedRow = { getFormattedValue(row) };
-            results.add(formattedRow);
+            results.add(getFormattedRow(context, row));
         }
         return results;
     }
@@ -137,8 +136,7 @@ public class SamzaExecutor implements SqlExecutor {
     public List<String[]> consumeQueryResult(ExecutionContext context, int startRow, int endRow) {
         List<String[]> results = new ArrayList<>();
         for (OutgoingMessageEnvelope row : outputData.consume(startRow, endRow)) {
-            String[] formattedRow = { getFormattedValue(row) };
-            results.add(formattedRow);
+            results.add(getFormattedRow(context, row));
         }
         return results;
     }
@@ -258,6 +256,15 @@ public class SamzaExecutor implements SqlExecutor {
             colTypeNames.add(dataTypeField.getType().toString());
         }
         return new TableSchema(colNames, colTypeNames);
+    }
+
+    private String[] getFormattedRow(ExecutionContext context, OutgoingMessageEnvelope row) {
+        String[] formattedRow = new String[1];
+        if (context == null || !context.getMessageFormat().equals(ExecutionContext.MessageFormat.COMPACT)){
+        } else {
+            formattedRow[0] = getCompressedFormat(row);
+        }
+        return formattedRow;
     }
 
     private static Map<String, String> fetchSamzaSqlConfig(int execId) {

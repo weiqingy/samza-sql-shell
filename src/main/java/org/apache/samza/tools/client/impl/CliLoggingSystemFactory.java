@@ -59,9 +59,9 @@ public class CliLoggingSystemFactory implements SystemFactory {
 
             SamzaExecutor.getOutputData().add(envelope);
             /*if (envelope.getKey() != null) {
-                System.out.println(String.format("Key:%s Value:%s", envelope.getKey(), CliUtil.getFormattedValue(envelope)));
+                System.out.println(String.format("Key:%s Value:%s", envelope.getKey(), CliUtil.getPrettyFormat(envelope)));
             } else {
-                System.out.println(CliUtil.getFormattedValue(envelope));
+                System.out.println(CliUtil.getPrettyFormat(envelope));
             }*/
         }
 

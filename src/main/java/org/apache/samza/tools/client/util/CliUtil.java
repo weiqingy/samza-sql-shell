@@ -54,7 +54,7 @@ public class CliUtil {
         return list;
     }
 
-    public static String getFormattedValue(OutgoingMessageEnvelope envelope) {
+    public static String getPrettyFormat(OutgoingMessageEnvelope envelope) {
         String value = new String((byte[]) envelope.getMessage());
         ObjectMapper mapper = new ObjectMapper();
         String formattedValue;
@@ -69,7 +69,7 @@ public class CliUtil {
         return formattedValue;
     }
 
-    public static String getCompressedValue(OutgoingMessageEnvelope envelope) {
+    public static String getCompressedFormat(OutgoingMessageEnvelope envelope) {
         return new String((byte[]) envelope.getMessage());
     }
 }

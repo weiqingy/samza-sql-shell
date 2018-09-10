@@ -1,7 +1,7 @@
 package org.apache.samza.tools.client.interfaces;
 
 public class ExecutionContext {
-    public MessageFormat m_messageFormat;
+    public MessageFormat m_messageFormat = MessageFormat.PRETTY;
 
     public void setMessageFormat(MessageFormat messageFormat) {
         m_messageFormat = messageFormat;
