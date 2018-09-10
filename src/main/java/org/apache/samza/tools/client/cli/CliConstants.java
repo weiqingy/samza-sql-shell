@@ -8,6 +8,7 @@ class CliConstants {
     public static final String PROMPT_1ST_END = "> ";
     public static final String PROMPT_2ND = "SQL";
     public static final String PROMPT_2ND_END = "> ";
+    public static final String VERSION = "0.0.1";
 
     public static final String WELCOME_MESSAGE;
     static {
@@ -25,7 +26,7 @@ class CliConstants {
 "   \\  \\:\\/:/        /  /:/        /  /:/     \\  \\:\\           /  /:/ \n"+
 "    \\  \\::/        /__/:/        /__/:/       \\  \\:\\         /__/:/ \n"+
 "     \\__\\/         \\__\\/         \\__\\/         \\__\\/         \\__\\/  \n\n"+
-"welcome to Samza SQL shell. Enter HELP for all commands.\n\n";
+"welcome to Samza SQL shell (V" + VERSION + "). Enter HELP for all commands.\n\n";
     }
 
     public static final char SPACE = '\u0020';
