@@ -4,6 +4,8 @@ import org.apache.samza.tools.client.interfaces.ExecutionContext;
 import org.apache.samza.tools.client.interfaces.QueryResult;
 import org.apache.samza.tools.client.interfaces.SqlExecutor;
 import org.apache.samza.tools.client.util.CliUtil;
+import org.jline.keymap.BindingReader;
+import org.jline.keymap.KeyMap;
 import org.jline.reader.UserInterruptException;
 import org.jline.terminal.Attributes;
 import org.jline.terminal.Cursor;
@@ -11,11 +13,14 @@ import org.jline.terminal.Size;
 import org.jline.terminal.Terminal;
 import org.jline.utils.*;
 
+import java.io.IOError;
+import java.io.IOException;
 import java.time.LocalTime;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+
+import static org.jline.keymap.KeyMap.ctrl;
+import static org.jline.keymap.KeyMap.esc;
+import static org.jline.keymap.KeyMap.key;
 
 
 /**
@@ -24,21 +29,23 @@ import java.util.Map;
 
 
 public class QueryResultExpendedLogView implements CliView {
-    private static final int DEFAULT_REFRESH_INTERVAL = 1000; // all intervals are in ms
+    private static final int DEFAULT_REFRESH_INTERVAL = 100; // all intervals are in ms
 
     private int m_refreshInterval = DEFAULT_REFRESH_INTERVAL;
-    private LocalTime m_lastRefreshTime;
     private int m_width;
     private int m_height;
-
     private CliShell m_shell;
     private QueryResult m_queryResult;
     private Terminal  m_terminal;
     private SqlExecutor m_executor;
     private ExecutionContext m_exeContext;
     private volatile boolean m_keepRunning = true;
+    private boolean m_paused = false;
 
-    private int m_counter;
+    // Stupid BindingReader doesn't have a real nonblocking mode
+    // Must create a new thread to get user input
+    private Thread m_inputThread;
+    private BindingReader m_keyReader;
 
     public QueryResultExpendedLogView() {
 
@@ -53,15 +60,16 @@ public class QueryResultExpendedLogView implements CliView {
         m_executor = shell.getExecutor();
         m_exeContext = shell.getExecutionContext();
 
+
+
         TerminalStatus prevStatus = setupTerminal();
         updateTerminalSize();
-
+        m_keyReader = new BindingReader(m_terminal.reader());
+        m_inputThread = new InputThread();
+        m_inputThread.start();
         while(m_keepRunning) {
             try {
-                boolean needsRefresh = true;
-                if(needsRefresh) {
-                    display();
-                }
+                display();
                 Thread.sleep(m_refreshInterval);
             } catch (InterruptedException e) {
                 continue;
@@ -73,32 +81,49 @@ public class QueryResultExpendedLogView implements CliView {
 
     // ------------------------------------------------------------------------
 
-
     private void display() {
+        int rowsInBuffer = m_executor.getRowCount();
         updateTerminalSize();
+        clearStatusBar();
+        if(rowsInBuffer <= 0 || m_paused) {
+            drawStatusBar(rowsInBuffer);
+            return;
+        }
 
-        // Clear status bar
+        while(rowsInBuffer > 0) {
+            int step = 10;
+            List<String[]> lines = m_executor.consumeQueryResult(m_exeContext, 0, step - 1);
+            for (String[] line : lines) {
+                for (int i = 0; i <line.length; ++i) {
+                    m_terminal.writer().write(line[i]);
+                    m_terminal.writer().write(i == line.length - 1 ? "\n" : " ");
+                }
+            }
+
+            rowsInBuffer = m_executor.getRowCount();
+            updateTerminalSize();
+            clearStatusBar();
+            drawStatusBar(rowsInBuffer);
+
+            if(m_paused) {
+                updateTerminalSize();
+                clearStatusBar();
+                drawStatusBar(rowsInBuffer);
+                return;
+            }
+        }
+    }
+
+    private void clearStatusBar() {
         m_terminal.puts(InfoCmp.Capability.save_cursor);
         m_terminal.puts(InfoCmp.Capability.cursor_address, m_height - 1, 0);
         m_terminal.puts(InfoCmp.Capability.delete_line, m_height - 1, 0);
         m_terminal.puts(InfoCmp.Capability.restore_cursor);
+    }
 
-        for(int i = 0; i < 70; ++i) {
-            m_terminal.writer().println("Test Message " + m_counter++);
-//            m_terminal.flush();
-//            try {
-//                Thread.sleep(500);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-        }
-
+    private void drawStatusBar(int rowsInBuffer) {
         m_terminal.puts(InfoCmp.Capability.save_cursor);
         m_terminal.puts(InfoCmp.Capability.cursor_address, m_height - 1, 0);
-
-        // print status bar
-        int rowsBehind = 1000;
-        boolean paused = true;
         AttributedStyle statusBarStyle = AttributedStyle.DEFAULT.background(AttributedStyle.WHITE)
                 .foreground(AttributedStyle.BLACK);
         AttributedStringBuilder attrBuilder = new AttributedStringBuilder()
@@ -110,18 +135,15 @@ public class QueryResultExpendedLogView implements CliView {
                 .append("SPACE")
                 .style(statusBarStyle)
                 .append(": Pause/Resume     ")
-                .append(String.valueOf(rowsBehind) + " rows in buffer     ");
-        if(paused) {
+                .append(String.valueOf(rowsInBuffer) + " rows in buffer     ");
+        if(m_paused) {
             attrBuilder.style(statusBarStyle.bold().foreground(AttributedStyle.RED).blink())
                     .append("PAUSED");
         }
-
-
         String statusBarText = attrBuilder.toAnsi();
         m_terminal.writer().print(statusBarText);
-
-        m_terminal.puts(InfoCmp.Capability.restore_cursor);
         m_terminal.flush();
+        m_terminal.puts(InfoCmp.Capability.restore_cursor);
     }
 
     private TerminalStatus setupTerminal() {
@@ -218,5 +240,41 @@ public class QueryResultExpendedLogView implements CliView {
         m_terminal.flush();
         m_width = m_terminal.getWidth();
         m_height = m_terminal.getHeight();
+    }
+
+    public enum Action {
+        QUIT,
+        SPACE
+    }
+
+    private KeyMap<Action> bindActionKey() {
+        KeyMap<Action> keyMap = new KeyMap<>();
+        keyMap.bind(Action.QUIT, "Q", "q", ctrl('c'));
+        keyMap.bind(Action.SPACE, " ");
+
+        return keyMap;
+    }
+
+    private class InputThread extends Thread {
+        public InputThread() {
+        }
+
+        public void run() {
+            KeyMap<Action> keyMap = bindActionKey();
+
+            Action action = m_keyReader.readBinding(keyMap, null, true);
+            while (action != null) {
+                switch (action) {
+                    case QUIT:
+                        m_keepRunning = false;
+                        return;
+                    case SPACE:
+                        m_paused = !m_paused;
+                        break;
+                }
+                action = m_keyReader.readBinding(keyMap, null, true);
+            }
+        }
+
     }
 }

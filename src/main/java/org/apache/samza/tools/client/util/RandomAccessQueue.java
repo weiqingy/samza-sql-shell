@@ -21,7 +21,7 @@ public class RandomAccessQueue<T> {
     m_buffer = buffer;
   }
 
-  public List<T> get(int start, int end) {
+  public synchronized List<T> get(int start, int end) {
     int lowerBound = Math.max(start, 0);
     int upperBound = Math.min(end, m_size - 1);
     List<T> rets = new ArrayList<>();
@@ -31,14 +31,14 @@ public class RandomAccessQueue<T> {
     return rets;
   }
 
-  public T get(int index) {
+  public synchronized T get(int index) {
     if (index >= 0 && index < m_size) {
       return m_buffer[(m_head + index) % m_capacity];
     }
     throw new CliException("OutOfBoundaryError");
   }
 
-  public void add(T t) {
+  public synchronized void add(T t) {
     if (m_size < m_capacity) {
       m_buffer[m_size] = t;
       m_size++;
@@ -51,22 +51,22 @@ public class RandomAccessQueue<T> {
   /**
    * Remove all element before 'end', and return elements between 'start' and 'end'
    */
-   public List<T> consume(int start, int end) {
+   public synchronized List<T> consume(int start, int end) {
      List<T> rets = get(start, end);
      m_head = (end + 1) % m_capacity;
      m_size -= end + 1;
      return rets;
    }
 
-  public int getHead() {
+  public synchronized int getHead() {
     return m_head;
   }
 
-  public int getSize() {
+  public synchronized int getSize() {
     return m_size;
   }
 
-  public void clear() {
+  public synchronized void clear() {
     m_head = 0;
     m_size = 0;
   }

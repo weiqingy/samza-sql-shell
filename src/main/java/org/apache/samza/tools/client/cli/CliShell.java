@@ -1,6 +1,6 @@
 package org.apache.samza.tools.client.cli;
 
-import org.apache.samza.tools.client.impl.FakeExecutor;
+import org.apache.samza.SamzaException;
 import org.apache.samza.tools.client.impl.SamzaExecutor;
 import org.apache.samza.tools.client.interfaces.*;
 import org.apache.samza.tools.client.util.CliException;
@@ -244,6 +244,7 @@ class CliShell {
     private void commandSelect(CliCommand command) {
         String fullCmd = command.getFullCommand();
 
+/*
         // This code snippet is for temporary select implementation purpose
         // For now the executor prints out to screen directly which is unacceptable
         Terminal.SignalHandler handler_INT = m_terminal.handle(Terminal.Signal.INT, this::handleSignal);
@@ -263,14 +264,21 @@ class CliShell {
 
         m_terminal.handle(Terminal.Signal.INT, handler_INT);
         m_terminal.handle(Terminal.Signal.QUIT, handler_QUIT);
+*/
+        try {
+            QueryResult queryResult = m_executor.executeQuery(m_exeContext, command.getFullCommand());
+            m_executions.put(queryResult.getExecutionId(), fullCmd);
 
-        /** REAL CODE
-        QueryResult queryResult = m_executor.executeQuery(m_exeContext, command.getFullCommand());
-        m_executions.put(queryResult.getExecutionId(), fullCmd);
+            CliView view = new QueryResultExpendedLogView();
+            view.open(this, queryResult);
+        } catch (SamzaException e) {
+            m_writer.write("Failed to query. Error: ");
+            m_writer.write(m_executor.getErrorMsg());
+            m_writer.write("\n\n");
+        }
 
-        CliView view = new QueryResultExpendedLogView();
-        view.open(this, queryResult);
-         */
+//        CliView view = new QueryResultExpendedLogView();
+//        view.open(this, null);
     }
 
     private void commandShowTables(CliCommand command) {
