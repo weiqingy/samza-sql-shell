@@ -15,8 +15,11 @@ import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
 import org.jline.utils.InfoCmp;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -137,8 +140,8 @@ class CliShell {
                         commandDescribe(command);
                         break;
 
-                    case SET:
-                        commandSet(command);
+                    case EXECUTE:
+                        commandExecuteFile(command);
                         break;
 
                     case INSERT_INTO:
@@ -151,6 +154,10 @@ class CliShell {
 
                     case SELECT:
                         commandSelect(command);
+                        break;
+
+                    case SET:
+                        commandSet(command);
                         break;
 
                     case SHOW_TABLES:
@@ -239,6 +246,37 @@ class CliShell {
         }
     }
 
+    private  void commandExecuteFile(CliCommand command) {
+        String parameters = command.getParameters();
+        if(parameters == null || parameters.isEmpty()) {
+            m_writer.println("Usage: execute <fileuri>\n");
+            m_writer.flush();
+            return;
+        }
+        URI uri = null;
+        boolean valid = false;
+        try {
+            uri = new URI(parameters);
+            File file = new File(uri.getPath());
+            valid = file.exists();
+        } catch (URISyntaxException e) {
+        }
+        if(!valid) {
+            m_writer.println("Invalid URI.\n");
+            m_writer.flush();
+            return;
+        }
+
+        try {
+            NonQueryResult nonQueryResult = m_executor.executeNonQuery(m_exeContext, uri);
+        }
+        catch (Exception e) {
+            m_writer.println("Execution error: " + e.getMessage());
+            m_writer.println("Exception: " + e.getClass().getName());
+            m_writer.println();
+        }
+    }
+
     private void commandInsertInto(CliCommand command) {
         // TODO: Remove the try catch blcok. Executor is not supposed to report error by exceptions
         try {
@@ -258,6 +296,7 @@ class CliShell {
         catch(Exception e) {
             m_writer.println("Execution error: " + e.getMessage());
             m_writer.println("Exception: " + e.getClass().getName());
+            m_writer.println();
         }
         m_writer.println();
         m_writer.flush();

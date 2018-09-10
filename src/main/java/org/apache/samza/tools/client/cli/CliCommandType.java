@@ -12,6 +12,7 @@ import java.util.List;
 enum CliCommandType {
     CLEAR           ("CLEAR", "\tClears the screen."),
     DESCRIBE        ("DESCRIBE", "Describes a table."),
+    EXECUTE         ("EXECUTE", "Execute a sql file."),
     INSERT_INTO     ("INSERT INTO", "Executes a SQL INSERT INTO."),
     HELP            ("HELP", "\tDisplays this help message."),
     SELECT          ("SELECT", "\tExecutes a SQL SELECT query."),
