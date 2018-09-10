@@ -116,7 +116,20 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public QueryResult executeQuery(ExecutionContext context, String statement) {
-        return executeSql(Collections.singletonList(statement), true);
+        List<String> sqlStmts = formatSqlStmts(Collections.singletonList(statement));
+
+        int execId = m_execIdSeq.incrementAndGet();
+        Map<String, String> staticConfigs = fetchSamzaSqlConfig(execId);
+        staticConfigs.put(SamzaSqlApplicationConfig.CFG_SQL_STMTS_JSON, JsonUtil.toJson(sqlStmts));
+
+        SamzaSqlApplicationRunner runner = new SamzaSqlApplicationRunner(true, new MapConfig(staticConfigs));
+        SamzaSqlApplication app = new SamzaSqlApplication();
+        runner.run(app);
+
+        m_executors.put(execId, new SamzaExecution(runner, app));
+        LOG.debug("Executing sql. Id ", execId);
+
+        return new QueryResult(execId, generateResultSchema(new MapConfig(staticConfigs)));
     }
 
     @Override
@@ -149,7 +162,20 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public NonQueryResult executeNonQuery(ExecutionContext context, List<String> statement) {
-        return new NonQueryResult(executeSql(statement, false).getExecutionId(), true);
+        statement = formatSqlStmts(statement);
+
+        int execId = m_execIdSeq.incrementAndGet();
+        Map<String, String> staticConfigs = fetchSamzaSqlConfig(execId);
+        staticConfigs.put(SamzaSqlApplicationConfig.CFG_SQL_STMTS_JSON, JsonUtil.toJson(statement));
+
+        SamzaSqlApplicationRunner runner = new SamzaSqlApplicationRunner(true, new MapConfig(staticConfigs));
+        SamzaSqlApplication app = new SamzaSqlApplication();
+        runner.run(app);
+
+        m_executors.put(execId, new SamzaExecution(runner, app));
+        LOG.debug("Executing sql. Id ", execId);
+
+        return new NonQueryResult(execId, true);
     }
 
     @Override
@@ -214,8 +240,8 @@ public class SamzaExecutor implements SqlExecutor {
 
     // -- private functions ------------------------------------------
 
-    private QueryResult executeSql(List<String> sqlStmts, boolean isQuery) {
-        sqlStmts = sqlStmts.stream().map(sql -> {
+    private List<String> formatSqlStmts(List<String> statements) {
+        return statements.stream().map(sql -> {
             if (!sql.toLowerCase().startsWith("insert")) {
                 String formattedSql = String.format("insert into log.outputStream %s", sql);
                 LOG.debug("Sql formatted. ", sql, formattedSql);
@@ -224,23 +250,6 @@ public class SamzaExecutor implements SqlExecutor {
                 return sql;
             }
         }).collect(Collectors.toList());
-
-        int execId = m_execIdSeq.incrementAndGet();
-        Map<String, String> staticConfigs = fetchSamzaSqlConfig(execId);
-        staticConfigs.put(SamzaSqlApplicationConfig.CFG_SQL_STMTS_JSON, JsonUtil.toJson(sqlStmts));
-
-        SamzaSqlApplicationRunner runner = new SamzaSqlApplicationRunner(true, new MapConfig(staticConfigs));
-        SamzaSqlApplication app = new SamzaSqlApplication();
-        runner.run(app);
-
-        m_executors.put(execId, new SamzaExecution(runner, app));
-        LOG.debug("Executing sql. Id ", execId);
-
-        if (isQuery) {
-            return new QueryResult(execId, generateResultSchema(new MapConfig(staticConfigs)));
-        } else {
-            return new QueryResult(execId, null);
-        }
     }
 
     private TableSchema generateResultSchema(Config config) {
