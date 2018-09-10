@@ -194,21 +194,7 @@ class CliShell {
         // TODO: Remove the try catch blcok. Executor is not supposed to report error by exceptions
         try {
             TableSchema tableSchema = m_executor.getTableScema(m_exeContext, command.getParameters());
-            if (tableSchema != null) {
-                int count = tableSchema.getColumnCount();
-                for (int i = 0; i < count; ++i) {
-                    m_writer.write(tableSchema.getColumnName(i));
-                    m_writer.write(CliConstants.SPACE);
-                    m_writer.write(tableSchema.getColumTypeName(i));
-                    if (i != count - 1)
-                        m_writer.write(",\n");
-                }
-                m_writer.write("\n\n");
-            } else {
-                m_writer.write("Failed to get table schema. Error: ");
-                m_writer.write(m_executor.getErrorMsg());
-                m_writer.write("\n\n");
-            }
+            printSchema(tableSchema);
         } catch(Exception e) {
             m_writer.println("Execution error: " + e.getMessage());
             m_writer.println("Exception: " + e.getClass().getName());
@@ -270,8 +256,8 @@ class CliShell {
             }
         }
         catch(Exception e) {
-            m_terminal.writer().println("Execution error: " + e.getMessage());
-            m_terminal.writer().println("Exception: " + e.getClass().getName());
+            m_writer.println("Execution error: " + e.getMessage());
+            m_writer.println("Exception: " + e.getClass().getName());
         }
         m_writer.println();
         m_writer.flush();
@@ -385,6 +371,60 @@ class CliShell {
 
     private void clearScreen() {
         m_terminal.puts(InfoCmp.Capability.clear_screen);
+    }
+
+    private void printSchema(TableSchema tableSchema) {
+        if(tableSchema == null) {
+            m_writer.write("Failed to get table schema. Error: ");
+            m_writer.write(m_executor.getErrorMsg());
+            m_writer.write("\n\n");
+            return;
+        }
+
+/*
+        Field   | Type
+        -------------------------
+        ROWTIME | BIGINT
+        ROWKEY  | VARCHAR(STRING)
+        IP      | VARCHAR(STRING)
+        KBYTES  | BIGINT
+        -------------------------
+*/
+        m_writer.println();
+
+        int seperatorPos = 10;
+        int terminalWidth = m_terminal.getWidth();
+        int maxLineLength = terminalWidth;
+        int count = tableSchema.getColumnCount();
+        for (int i = 0; i < count; ++i) {
+            String fieldName = tableSchema.getColumnName(i);
+            seperatorPos = Math.max(fieldName.length() + 1, seperatorPos);
+        }
+        seperatorPos = Math.min(seperatorPos, terminalWidth / 2);
+        for (int i = 0; i < count; ++i) {
+            String typeName = tableSchema.getColumTypeName(i);
+            maxLineLength = Math.max(typeName.length() + seperatorPos, seperatorPos);
+        }
+        maxLineLength += 6;
+        maxLineLength = Math.min(maxLineLength, terminalWidth);
+        for (int i = -1; i < count; ++i) {
+            m_writer.write(' ');
+            String fieldName = i == -1 ? "Field" : tableSchema.getColumnName(i);
+            for(int j = 0; j < seperatorPos - 1; ++j) {
+                m_writer.write(j < fieldName.length() ? fieldName.charAt(j) : ' ' );
+            }
+            m_writer.write(" | ");
+            m_writer.println(i == -1 ? "Type" : tableSchema.getColumTypeName(i));
+
+            if(i == -1 || i == count - 1) {
+                for(int j = 0; j < maxLineLength; ++j) {
+                    m_writer.write('-');
+                }
+                m_writer.println();
+            }
+
+        }
+        m_writer.flush();
     }
 
 
