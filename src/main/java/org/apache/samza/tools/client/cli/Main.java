@@ -15,9 +15,9 @@ public class Main {
         CliShell shell = new CliShell();
         shell.open();
 
-//        String testStmt = "select * from kafka.ProfileChangeStream";
-//        SamzaExecutor cliExecutor = new SamzaExecutor();
-//        cliExecutor.executeSql(Collections.singletonList(testStmt));
+        /* String testStmt = "select * from kafka.ProfileChangeStream";
+          SamzaExecutor cliExecutor = new SamzaExecutor();
+          cliExecutor.executeQuery(null , testStmt); */
     }
 
     private  static void Test(List<String> a) {

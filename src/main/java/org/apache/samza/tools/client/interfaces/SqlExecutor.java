@@ -1,6 +1,7 @@
 package org.apache.samza.tools.client.interfaces;
 
 
+import java.net.URI;
 import java.util.List;
 
 /**
@@ -59,6 +60,8 @@ public interface SqlExecutor {
      */
     public QueryResult executeQuery(ExecutionContext context, String statement);
 
+
+
     /**
      * @return how many rows for reading.
      */
@@ -73,16 +76,22 @@ public interface SqlExecutor {
 
     /**
      * Consumes rows from query result. Executor shall drop them, as "consume" indicates.
-     * @param count 0 or negative number means all data.
-     * @return
+     * All the data before endRow (inclusive) will be deleted.
+     * @return available data between startRow and endRow (both are inclusive)
      */
     // For loging view mode. Still not sure what the interface should be like.
     // Don't support thie method for now.
-    // public List<String[]> consumeQueryResult(ExecutionContext context, int count);
+    public List<String[]> consumeQueryResult(ExecutionContext context, int startRow, int endRow);
+
+    /**
+     * Executes all the NON-QUERY statements in the sqlFile.
+     * Query statements are ignored as it won't make sense.
+     */
+    public NonQueryResult executeNonQuery(ExecutionContext context, URI sqlFile);
 
     /**
      */
-    public NonQueryResult executeNonQuery(ExecutionContext context, List<String> statement);
+    public NonQueryResult executeNonQuery(ExecutionContext context, List<String> statements);
 
     /**
      */

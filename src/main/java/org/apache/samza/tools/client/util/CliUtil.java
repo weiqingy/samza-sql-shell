@@ -1,9 +1,17 @@
 package org.apache.samza.tools.client.util;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.samza.system.OutgoingMessageEnvelope;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public class CliUtil {
+    private static final Logger LOG = LoggerFactory.getLogger(CliUtil.class);
+
     public static boolean isStringNullOrEmpty(String str) {
         return str == null || str.isEmpty();
     }
@@ -46,4 +54,22 @@ public class CliUtil {
         return list;
     }
 
+    public static String getFormattedValue(OutgoingMessageEnvelope envelope) {
+        String value = new String((byte[]) envelope.getMessage());
+        ObjectMapper mapper = new ObjectMapper();
+        String formattedValue;
+        try {
+            Object json = mapper.readValue(value, Object.class);
+            formattedValue = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json);
+        } catch (IOException e) {
+            formattedValue = value;
+            LOG.error("Error while formatting json", e);
+        }
+
+        return formattedValue;
+    }
+
+    public static String getCompressedValue(OutgoingMessageEnvelope envelope) {
+        return new String((byte[]) envelope.getMessage());
+    }
 }

@@ -1,5 +1,6 @@
 package org.apache.samza.tools.client.impl;
 
+import java.net.URI;
 import org.apache.samza.tools.client.interfaces.*;
 
 import java.util.ArrayList;
@@ -17,14 +18,17 @@ public class FakeExecutor implements SqlExecutor {
 
     }
 
+    @Override
     public void start(ExecutionContext context) {
 
     }
 
+    @Override
     public void stop(ExecutionContext context) {
 
     }
 
+    @Override
     public List<String> listTables(ExecutionContext context) {
         List<String> tableNames = new ArrayList<String>();
         tableNames.add("kafka.ProfileChangeStream");
@@ -32,6 +36,7 @@ public class FakeExecutor implements SqlExecutor {
         return tableNames;
     }
 
+    @Override
     public TableSchema getTableScema(ExecutionContext context, String tableName) {
         return TableSchemaBuilder.builder().appendColumn("Key", "String")
                 .appendColumn("Name", "String")
@@ -41,7 +46,7 @@ public class FakeExecutor implements SqlExecutor {
                 .toTableSchema();
     }
 
-
+    @Override
     public QueryResult executeQuery(ExecutionContext context, String statement) {
         TableSchema schema = TableSchemaBuilder.builder().
                 appendColumn("All", "String").toTableSchema();
@@ -49,35 +54,52 @@ public class FakeExecutor implements SqlExecutor {
         return new QueryResult(1, schema);
     }
 
+    @Override
     public int getRowCount() {
         return 0;
     }
 
+    @Override
     public List<String[]> retrieveQueryResult(ExecutionContext context, int startRow, int endRow) {
         return null;
     }
 
+    @Override
+    public List<String[]> consumeQueryResult(ExecutionContext context, int startRow, int endRow) {
+        throw new ExecutionException("not supported");
+    }
+
+    @Override
+    public NonQueryResult executeNonQuery(ExecutionContext context,  URI sqlFile) {
+        return null;
+    }
+
+    @Override
     public NonQueryResult executeNonQuery(ExecutionContext context, List<String> statement) {
         return new NonQueryResult(++m_execIdSeq, true);
     }
 
+    @Override
     public boolean stopExecution(ExecutionContext context, int exeId) {
         return false;
     }
 
+    @Override
     public boolean removeExecution(ExecutionContext context, int exeId) {
         return false;
     }
 
+    @Override
     public ExecutionStatus queryExecutionStatus(int execId) {
         return null;
     }
 
-    public boolean stopExecution(int execId) {
-        return false;
-    }
-
+    @Override
     public String getErrorMsg() {
         return null;
+    }
+
+    private boolean stopExecution(int execId) {
+        return false;
     }
 }

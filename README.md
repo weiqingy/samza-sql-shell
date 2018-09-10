@@ -22,6 +22,9 @@ Currently SamzaSQL shell depends on Samza version [0.14.1](http://samza.apache.o
 mvn package with "-Passembly" will assemble all the required dependencies and packages into an assembly jar.
 
     mvn clean package -Passembly
+Skip tests
+
+    mvn clean -DskipTests package
 
 ## Populate data
 

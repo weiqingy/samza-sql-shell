@@ -4,11 +4,10 @@ import org.apache.samza.Partition;
 import org.apache.samza.config.Config;
 import org.apache.samza.metrics.MetricsRegistry;
 import org.apache.samza.system.*;
-import org.codehaus.jackson.map.ObjectMapper;
+import org.apache.samza.tools.client.util.CliUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
@@ -20,7 +19,6 @@ public class CliLoggingSystemFactory implements SystemFactory {
 
     private static final Logger LOG = LoggerFactory.getLogger(CliLoggingSystemFactory.class);
     private static AtomicInteger messageCounter = new AtomicInteger(0);
-    private static ObjectMapper mapper = new ObjectMapper();
 
     @Override
     public SystemConsumer getConsumer(String systemName, Config config, MetricsRegistry registry) {
@@ -54,35 +52,21 @@ public class CliLoggingSystemFactory implements SystemFactory {
 
         @Override
         public void send(String source, OutgoingMessageEnvelope envelope) {
+            LOG.info(String.format(String.format("Message %d :", messageCounter.incrementAndGet())));
             String msg = String.format("OutputStream:%s Key:%s Value:%s", envelope.getSystemStream(), envelope.getKey(),
                     new String((byte[]) envelope.getMessage()));
             LOG.info(msg);
 
-            System.out.println(String.format("Message %d :", messageCounter.incrementAndGet()));
-            if (envelope.getKey() != null) {
-                System.out.println(String.format("Key:%s Value:%s", envelope.getKey(), getFormattedValue(envelope)));
+            SamzaExecutor.getOutputData().add(envelope);
+            /*if (envelope.getKey() != null) {
+                System.out.println(String.format("Key:%s Value:%s", envelope.getKey(), CliUtil.getFormattedValue(envelope)));
             } else {
-                System.out.println(getFormattedValue(envelope));
-            }
+                System.out.println(CliUtil.getFormattedValue(envelope));
+            }*/
         }
 
         @Override
         public void flush(String source) {
-        }
-
-        private String getFormattedValue(OutgoingMessageEnvelope envelope) {
-            String value = new String((byte[]) envelope.getMessage());
-            String formattedValue;
-
-            try {
-                Object json = mapper.readValue(value, Object.class);
-                formattedValue = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json);
-            } catch (IOException e) {
-                formattedValue = value;
-                LOG.error("Error while formatting json", e);
-            }
-
-            return formattedValue;
         }
     }
 
@@ -115,6 +99,4 @@ public class CliLoggingSystemFactory implements SystemFactory {
             return offset1.compareTo(offset2);
         }
     }
-
-
 }

@@ -1,10 +1,13 @@
 package org.apache.samza.tools.client.impl;
 
-
+import java.net.URI;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.samza.config.Config;
 import org.apache.samza.config.JobConfig;
 import org.apache.samza.config.JobCoordinatorConfig;
 import org.apache.samza.config.MapConfig;
@@ -17,15 +20,19 @@ import org.apache.samza.sql.fn.RegexMatchUdf;
 import org.apache.samza.sql.impl.ConfigBasedIOResolverFactory;
 import org.apache.samza.sql.impl.ConfigBasedUdfResolver;
 import org.apache.samza.sql.interfaces.SqlIOConfig;
+import org.apache.samza.sql.planner.QueryPlanner;
 import org.apache.samza.sql.runner.SamzaSqlApplication;
 import org.apache.samza.sql.runner.SamzaSqlApplicationConfig;
 import org.apache.samza.sql.runner.SamzaSqlApplicationRunner;
 import org.apache.samza.sql.testutil.JsonUtil;
+import org.apache.samza.sql.testutil.SqlFileParser;
 import org.apache.samza.standalone.PassthroughJobCoordinatorFactory;
+import org.apache.samza.system.OutgoingMessageEnvelope;
 import org.apache.samza.system.kafka.KafkaSystemFactory;
 import org.apache.samza.tools.avro.AvroSchemaGenRelConverterFactory;
 import org.apache.samza.tools.avro.AvroSerDeFactory;
 import org.apache.samza.tools.client.interfaces.*;
+import org.apache.samza.tools.client.util.RandomAccessQueue;
 import org.apache.samza.tools.json.JsonRelConverterFactory;
 import org.apache.samza.tools.schemas.PageViewEvent;
 import org.apache.samza.tools.schemas.ProfileChangeEvent;
@@ -33,31 +40,44 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Joiner;
 
+import static org.apache.samza.tools.client.util.CliUtil.*;
+
 
 public class SamzaExecutor implements SqlExecutor {
     private static final Logger LOG = LoggerFactory.getLogger(SamzaExecutor.class);
     private static final String SAMZA_SYSTEM_KAFKA = "kafka";
     private static final String SAMZA_SYSTEM_LOG = "log";
+    private static final int RANDOM_ACCESS_QUEUE_CAPACITY = 5000;
 
     private static class SamzaExecution {
         SamzaSqlApplicationRunner runner;
         SamzaSqlApplication app;
-        ExecutionStatus status;
 
         SamzaExecution(SamzaSqlApplicationRunner runner, SamzaSqlApplication app) {
             this.runner = runner;
             this.app = app;
-            this.status = status;
         }
 
         ExecutionStatus getExecutionStatus() {
-            // return new ExecutionStatus(runner.status(app).getStatusCode());
-            return ExecutionStatus.New;
+            switch (runner.status(app).getStatusCode()) {
+                case New:
+                    return ExecutionStatus.New;
+                case Running:
+                    return ExecutionStatus.Running;
+                case SuccessfulFinish:
+                    return ExecutionStatus.SuccessfulFinish;
+                case UnsuccessfulFinish:
+                    return ExecutionStatus.UnsuccessfulFinish;
+                default:
+                    throw new ExecutionException(String.format("Unsupported execution status %s",
+                        runner.status(app).getStatusCode().toString()));
+            }
         }
     }
     private static AtomicInteger m_execIdSeq = new AtomicInteger(0);
     private HashMap<Integer, SamzaExecution> m_executors = new HashMap<>();
-
+    private static RandomAccessQueue<OutgoingMessageEnvelope> outputData =
+        new RandomAccessQueue<>(OutgoingMessageEnvelope.class, RANDOM_ACCESS_QUEUE_CAPACITY);
 
     // -- implementation of SqlExecutor ------------------------------------------
 
@@ -69,8 +89,10 @@ public class SamzaExecutor implements SqlExecutor {
     @Override
     public void stop(ExecutionContext context) {
         for (int execId : m_executors.keySet()) {
-            stopExecution(execId);
+            stopExecution(null, execId);
+            removeExecution(null, execId);
         }
+        outputData.clear();
     }
 
     @Override
@@ -93,38 +115,79 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public QueryResult executeQuery(ExecutionContext context, String statement) {
-        int execId = executeSql(Collections.singletonList(statement));
-
-        TableSchema schema = TableSchemaBuilder.builder().
-                appendColumn("All", "String").toTableSchema();
-
-        return new QueryResult(1, schema);
+        return executeSql(Collections.singletonList(statement), true);
     }
 
     @Override
     public int getRowCount() {
-        throw new ExecutionException("not supported");
+        return outputData.getSize();
     }
 
     @Override
     public List<String[]> retrieveQueryResult(ExecutionContext context, int startRow, int endRow) {
-        throw new ExecutionException("not supported");
+        List<String[]> results = new ArrayList<>();
+        for (OutgoingMessageEnvelope row : outputData.get(startRow, endRow)) {
+            String[] formattedRow = { getFormattedValue(row) };
+            results.add(formattedRow);
+        }
+        return results;
+    }
+
+    @Override
+    public List<String[]> consumeQueryResult(ExecutionContext context, int startRow, int endRow) {
+        List<String[]> results = new ArrayList<>();
+        for (OutgoingMessageEnvelope row : outputData.consume(startRow, endRow)) {
+            String[] formattedRow = { getFormattedValue(row) };
+            results.add(formattedRow);
+        }
+        return results;
+    }
+
+    @Override
+    public NonQueryResult executeNonQuery(ExecutionContext context,  URI sqlFile) {
+        return executeNonQuery(context, SqlFileParser.parseSqlFile(sqlFile.getPath()));
     }
 
     @Override
     public NonQueryResult executeNonQuery(ExecutionContext context, List<String> statement) {
-        int execId = executeSql(statement);
-        return new NonQueryResult(execId, true);
+        return new NonQueryResult(executeSql(statement, false).getExecutionId(), true);
     }
 
     @Override
     public boolean stopExecution(ExecutionContext context, int exeId) {
-        return stopExecution(exeId);
+        SamzaExecution exec = m_executors.get(exeId);
+        if(exec != null) {
+            exec.runner.kill(exec.app);
+            LOG.debug("Stopping execution ", exeId);
+
+            try {
+                Thread.sleep(500); // wait for a second
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            return true;
+        } else {
+            LOG.warn("Trying to stop a non-existing SQL execution ", exeId);
+            return false;
+        }
     }
 
     @Override
     public boolean removeExecution(ExecutionContext context, int exeId) {
-        throw new ExecutionException("not supported");
+        SamzaExecution exec = m_executors.get(exeId);
+        if(exec != null) {
+            if (exec.getExecutionStatus().equals(ExecutionStatus.Running)) {
+                LOG.error("Trying to remove a ongoing execution ", exeId);
+                return false;
+            }
+            m_executors.remove(exeId);
+            LOG.debug("Stopping execution ", exeId);
+            return true;
+        } else {
+            LOG.warn("Trying to remove a non-existing SQL execution ", exeId);
+            return false;
+        }
     }
 
     @Override
@@ -132,7 +195,7 @@ public class SamzaExecutor implements SqlExecutor {
         if (!m_executors.containsKey(execId)) {
             return null;
         }
-        return m_executors.get(execId).status;
+        return m_executors.get(execId).getExecutionStatus();
     }
 
     @Override
@@ -140,13 +203,18 @@ public class SamzaExecutor implements SqlExecutor {
         throw new ExecutionException("not supported");
     }
 
-    // ------------------------------------------------------------------------
-    /*private int executeSqlFile(String sqlFile) {
-          List<String> sqlStmts = SqlFileParser.parseSqlFile(sqlFile);
-          return executeSql(sqlStmts);
-     }*/
+    static RandomAccessQueue<OutgoingMessageEnvelope> getOutputData() {
+        return outputData;
+    }
 
-     private int executeSql(List<String> sqlStmts) {
+    /**
+     *TODO: API for users to pass in data schema
+     */
+
+
+    // -- private functions ------------------------------------------
+
+    private QueryResult executeSql(List<String> sqlStmts, boolean isQuery) {
         sqlStmts = sqlStmts.stream().map(sql -> {
             if (!sql.toLowerCase().startsWith("insert")) {
                 String formattedSql = String.format("insert into log.outputStream %s", sql);
@@ -167,27 +235,29 @@ public class SamzaExecutor implements SqlExecutor {
 
         m_executors.put(execId, new SamzaExecution(runner, app));
         LOG.debug("Executing sql. Id ", execId);
-        return execId;
+
+        if (isQuery) {
+            return new QueryResult(execId, generateResultSchema(new MapConfig(staticConfigs)));
+        } else {
+            return new QueryResult(execId, null);
+        }
     }
 
-    private boolean stopExecution(int exeId) {
-        SamzaExecution exec = m_executors.get(exeId);
-        if(exec != null) {
-            exec.runner.kill(exec.app);
-            m_executors.remove(exeId);
-            LOG.debug("Stopping execution ", exeId);
+    private TableSchema generateResultSchema(Config config) {
+        SamzaSqlApplicationConfig sqlConfig = new SamzaSqlApplicationConfig(config);
+        QueryPlanner planner = new QueryPlanner(
+            sqlConfig.getRelSchemaProviders(),
+            sqlConfig.getInputSystemStreamConfigBySource(),
+            sqlConfig.getUdfMetadata());
+        RelRoot relRoot = planner.plan(sqlConfig.getQueryInfo().get(0).getSelectQuery());
 
-            try {
-                Thread.sleep(500); // wait for a second
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
-            return true;
-        } else {
-            LOG.warn("Trying to stop a non-existing SQL execution ", exeId);
-            return false;
+        List<String> colNames = new ArrayList<>();
+        List<String> colTypeNames = new ArrayList<>();
+        for (RelDataTypeField dataTypeField : relRoot.validatedRowType.getFieldList()) {
+            colNames.add(dataTypeField.getName());
+            colTypeNames.add(dataTypeField.getType().toString());
         }
+        return new TableSchema(colNames, colTypeNames);
     }
 
     private static Map<String, String> fetchSamzaSqlConfig(int execId) {
