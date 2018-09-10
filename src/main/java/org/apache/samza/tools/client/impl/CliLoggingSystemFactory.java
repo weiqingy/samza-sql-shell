@@ -4,7 +4,6 @@ import org.apache.samza.Partition;
 import org.apache.samza.config.Config;
 import org.apache.samza.metrics.MetricsRegistry;
 import org.apache.samza.system.*;
-import org.apache.samza.tools.client.util.CliUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +56,7 @@ public class CliLoggingSystemFactory implements SystemFactory {
                     new String((byte[]) envelope.getMessage()));
             LOG.info(msg);
 
-            SamzaExecutor.getOutputData().add(envelope);
+            SamzaExecutor.getM_outputData().add(envelope);
             /*if (envelope.getKey() != null) {
                 System.out.println(String.format("Key:%s Value:%s", envelope.getKey(), CliUtil.getPrettyFormat(envelope)));
             } else {

@@ -97,7 +97,7 @@ public class QueryResultExpendedLogView implements CliView {
             List<String[]> lines = m_executor.consumeQueryResult(m_exeContext, 0, step - 1);
             for (String[] line : lines) {
                 for (int i = 0; i <line.length; ++i) {
-                    m_terminal.writer().write(line[i]);
+                    m_terminal.writer().write(line[i] == null ? "null" : line[i]);
                     m_terminal.writer().write(i == line.length - 1 ? "\n" : " ");
                 }
             }

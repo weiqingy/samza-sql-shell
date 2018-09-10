@@ -2,6 +2,7 @@ package org.apache.samza.tools.client.impl;
 
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -75,8 +76,8 @@ public class SamzaExecutor implements SqlExecutor {
         }
     }
     private static AtomicInteger m_execIdSeq = new AtomicInteger(0);
-    private HashMap<Integer, SamzaExecution> m_executors = new HashMap<>();
-    private static RandomAccessQueue<OutgoingMessageEnvelope> outputData =
+    private ConcurrentHashMap<Integer, SamzaExecution> m_executors = new ConcurrentHashMap<>();
+    private static RandomAccessQueue<OutgoingMessageEnvelope> m_outputData =
         new RandomAccessQueue<>(OutgoingMessageEnvelope.class, RANDOM_ACCESS_QUEUE_CAPACITY);
 
     // -- implementation of SqlExecutor ------------------------------------------
@@ -92,7 +93,7 @@ public class SamzaExecutor implements SqlExecutor {
             stopExecution(null, execId);
             removeExecution(null, execId);
         }
-        outputData.clear();
+        m_outputData.clear();
     }
 
     @Override
@@ -120,13 +121,13 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public int getRowCount() {
-        return outputData.getSize();
+        return m_outputData.getSize();
     }
 
     @Override
     public List<String[]> retrieveQueryResult(ExecutionContext context, int startRow, int endRow) {
         List<String[]> results = new ArrayList<>();
-        for (OutgoingMessageEnvelope row : outputData.get(startRow, endRow)) {
+        for (OutgoingMessageEnvelope row : m_outputData.get(startRow, endRow)) {
             results.add(getFormattedRow(context, row));
         }
         return results;
@@ -135,7 +136,7 @@ public class SamzaExecutor implements SqlExecutor {
     @Override
     public List<String[]> consumeQueryResult(ExecutionContext context, int startRow, int endRow) {
         List<String[]> results = new ArrayList<>();
-        for (OutgoingMessageEnvelope row : outputData.consume(startRow, endRow)) {
+        for (OutgoingMessageEnvelope row : m_outputData.consume(startRow, endRow)) {
             results.add(getFormattedRow(context, row));
         }
         return results;
@@ -156,6 +157,7 @@ public class SamzaExecutor implements SqlExecutor {
         SamzaExecution exec = m_executors.get(exeId);
         if(exec != null) {
             exec.runner.kill(exec.app);
+            m_outputData.clear();
             LOG.debug("Stopping execution ", exeId);
 
             try {
@@ -201,8 +203,8 @@ public class SamzaExecutor implements SqlExecutor {
         throw new ExecutionException("not supported");
     }
 
-    static RandomAccessQueue<OutgoingMessageEnvelope> getOutputData() {
-        return outputData;
+    static RandomAccessQueue<OutgoingMessageEnvelope> getM_outputData() {
+        return m_outputData;
     }
 
     /**
@@ -261,6 +263,7 @@ public class SamzaExecutor implements SqlExecutor {
     private String[] getFormattedRow(ExecutionContext context, OutgoingMessageEnvelope row) {
         String[] formattedRow = new String[1];
         if (context == null || !context.getMessageFormat().equals(ExecutionContext.MessageFormat.COMPACT)){
+            formattedRow[0] = getPrettyFormat(row);
         } else {
             formattedRow[0] = getCompressedFormat(row);
         }

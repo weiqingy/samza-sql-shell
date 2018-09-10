@@ -137,6 +137,10 @@ class CliShell {
                         commandDescribe(command);
                         break;
 
+                    case SET:
+                        commandSet(command);
+                        break;
+
                     case INSERT_INTO:
                         commandInsertInto(command);
                         break;
@@ -206,10 +210,47 @@ class CliShell {
                 m_writer.write("\n\n");
             }
         } catch(Exception e) {
-            m_terminal.writer().println("Execution error: " + e.getMessage());
-            m_terminal.writer().println("Exception: " + e.getClass().getName());
+            m_writer.println("Execution error: " + e.getMessage());
+            m_writer.println("Exception: " + e.getClass().getName());
         }
         m_writer.flush();
+    }
+
+    private void commandSet(CliCommand command) {
+        String param = command.getParameters();
+        if(param == null) {
+            m_writer.println("OUTPUT=" + m_exeContext.getMessageFormat());
+            m_writer.println();
+            m_writer.flush();
+            return;
+        }
+        param = param.toUpperCase();
+        String[] params = param.split("=");
+        if(params.length != 2) {
+            m_writer.println("Usage: SET VAR=VAL\n");
+            m_writer.flush();
+            return;
+        }
+
+        // TODO: When more set parameters come, move the code to a seperate class
+        switch (params[0]) {
+            case "OUTPUT":
+                if(params[1].equals("PRETTY")) {
+                    m_exeContext.setMessageFormat(ExecutionContext.MessageFormat.PRETTY);
+                }
+                else if (params[1].equals("COMPACT")) {
+                    m_exeContext.setMessageFormat(ExecutionContext.MessageFormat.COMPACT);
+                }
+                else {
+                    m_writer.println("possible value for OUTPUT: PRETTY, COMPACT\n");
+                    m_writer.flush();
+                }
+                break;
+            default:
+                m_writer.println("Current supported variables:\n");
+                m_writer.println("OUTPUT\t\tPRETTY|COMPACT\n");
+                m_writer.flush();
+        }
     }
 
     private void commandInsertInto(CliCommand command) {
@@ -271,14 +312,12 @@ class CliShell {
 
             CliView view = new QueryResultExpendedLogView();
             view.open(this, queryResult);
+            m_executor.stopExecution(m_exeContext, queryResult.getExecutionId());
         } catch (SamzaException e) {
             m_writer.write("Failed to query. Error: ");
             m_writer.write(e.getMessage());
             m_writer.write("\n\n");
         }
-
-//        CliView view = new QueryResultExpendedLogView();
-//        view.open(this, null);
     }
 
     private void commandShowTables(CliCommand command) {
