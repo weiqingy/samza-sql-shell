@@ -18,6 +18,8 @@
         <jackson.version>1.9.13</jackson.version>
         <junit.version>4.12</junit.version>
         <surefire.version>2.22.0</surefire.version>
+        <calcite.version>1.14.0</calcite.version>
+        <jna.version>4.5.1</jna.version>
     </properties>
 
     <dependencies>
@@ -92,6 +94,18 @@
             <artifactId>junit</artifactId>
             <version>${junit.version}</version>
             <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.calcite</groupId>
+            <artifactId>calcite-core</artifactId>
+            <version>${calcite.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna</artifactId>
+            <version>${jna.version}</version>
         </dependency>
     </dependencies>
 
