@@ -3,6 +3,8 @@ package org.apache.samza.tools.client.interfaces;
 
 import java.net.URI;
 import java.util.List;
+import org.apache.samza.tools.client.cli.UdfDisplayInfo;
+
 
 /**
  *  Conventions:
@@ -112,4 +114,11 @@ public interface SqlExecutor {
      *
      */
     public String getErrorMsg();
+
+    /**
+     *
+     * @param m_exeContext
+     * @return
+     */
+    List<UdfDisplayInfo> listFunctions(ExecutionContext m_exeContext);
 }

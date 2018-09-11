@@ -11,8 +11,6 @@ import kafka.utils.ZkUtils;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.ZkConnection;
 import org.apache.avro.Schema;
-import org.apache.calcite.rel.RelRoot;
-import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.commons.lang.Validate;
 import org.apache.samza.SamzaException;
 import org.apache.samza.config.Config;
@@ -31,7 +29,6 @@ import org.apache.samza.sql.interfaces.RelSchemaProvider;
 import org.apache.samza.sql.interfaces.RelSchemaProviderFactory;
 import org.apache.samza.sql.interfaces.SqlIOConfig;
 import org.apache.samza.sql.interfaces.SqlIOResolver;
-import org.apache.samza.sql.planner.QueryPlanner;
 import org.apache.samza.sql.runner.SamzaSqlApplication;
 import org.apache.samza.sql.runner.SamzaSqlApplicationConfig;
 import org.apache.samza.sql.runner.SamzaSqlApplicationRunner;
@@ -43,11 +40,13 @@ import org.apache.samza.system.OutgoingMessageEnvelope;
 import org.apache.samza.system.kafka.KafkaSystemFactory;
 import org.apache.samza.tools.avro.AvroSchemaGenRelConverterFactory;
 import org.apache.samza.tools.avro.AvroSerDeFactory;
+import org.apache.samza.tools.client.cli.UdfDisplayInfo;
 import org.apache.samza.tools.client.interfaces.*;
 import org.apache.samza.tools.client.schema.FileSystemAvroRelSchemaProviderFactory;
 import org.apache.samza.tools.client.util.RandomAccessQueue;
 import org.apache.samza.tools.json.JsonRelConverterFactory;
 import org.apache.samza.tools.schemas.ProfileChangeEvent;
+import org.apache.samza.tools.client.udfs.GetSqlFieldUdf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Joiner;
@@ -320,6 +319,23 @@ public class SamzaExecutor implements SqlExecutor {
         throw new ExecutionException("not supported");
     }
 
+    @Override
+    public List<UdfDisplayInfo> listFunctions(ExecutionContext m_exeContext) {
+        List<UdfDisplayInfo> udfs = new ArrayList<>();
+        udfs.add(new UdfDisplayInfo("RegexMatch", "Matches the string to the regex",
+            Arrays.asList(SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING),
+                SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING)),
+            SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.BOOLEAN)));
+
+        udfs.add(new UdfDisplayInfo("GetSqlField", "Get ane element from complex field (Array, MAP, ROW)",
+            Arrays.asList(SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.ANY),
+                SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING)),
+            SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.ANY)));
+
+        return udfs;
+
+    }
+
     static RandomAccessQueue<OutgoingMessageEnvelope> getM_outputData() {
         return m_outputData;
     }
@@ -386,7 +402,7 @@ public class SamzaExecutor implements SqlExecutor {
         staticConfigs.put(configUdfResolverDomain + SamzaSqlApplicationConfig.CFG_FACTORY,
                 ConfigBasedUdfResolver.class.getName());
         staticConfigs.put(configUdfResolverDomain + ConfigBasedUdfResolver.CFG_UDF_CLASSES,
-                Joiner.on(",").join(RegexMatchUdf.class.getName(), FlattenUdf.class.getName()));
+                Joiner.on(",").join(RegexMatchUdf.class.getName(), FlattenUdf.class.getName(), GetSqlFieldUdf.class.getName()));
 
         staticConfigs.put("serializers.registry.string.class", StringSerdeFactory.class.getName());
         staticConfigs.put("serializers.registry.avro.class", AvroSerDeFactory.class.getName());
