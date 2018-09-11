@@ -40,6 +40,7 @@ import org.apache.samza.sql.testutil.ReflectionUtils;
 import org.apache.samza.sql.testutil.SqlFileParser;
 import org.apache.samza.standalone.PassthroughJobCoordinatorFactory;
 import org.apache.samza.system.OutgoingMessageEnvelope;
+import org.apache.samza.system.eventhub.EventHubSystemFactory;
 import org.apache.samza.system.kafka.KafkaSystemFactory;
 import org.apache.samza.tools.avro.AvroSchemaGenRelConverterFactory;
 import org.apache.samza.tools.avro.AvroSerDeFactory;
@@ -53,6 +54,7 @@ import org.apache.samza.tools.client.udfs.GetSqlFieldUdf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Joiner;
+import scala.collection.JavaConversions;
 
 import static org.apache.samza.sql.runner.SamzaSqlApplicationConfig.*;
 import static org.apache.samza.tools.client.util.CliUtil.*;
@@ -61,6 +63,7 @@ import static org.apache.samza.tools.client.util.CliUtil.*;
 public class SamzaExecutor implements SqlExecutor {
     private static final Logger LOG = LoggerFactory.getLogger(SamzaExecutor.class);
     private static final String SAMZA_SYSTEM_KAFKA = "kafka";
+    private static final String SAMZA_SYSTEM_EVENTHUBS = "eventhub";
     private static final String SAMZA_SYSTEM_LOG = "log";
     private static final int RANDOM_ACCESS_QUEUE_CAPACITY = 5000;
 
@@ -114,10 +117,15 @@ public class SamzaExecutor implements SqlExecutor {
     public List<String> listTables(ExecutionContext context) {
         String address = "localhost:2181";
         ZkUtils zkUtils = new ZkUtils(new ZkClient(address), new ZkConnection(address), false);
-        return scala.collection.JavaConversions.seqAsJavaList(zkUtils.getAllTopics())
+        List<String> tables = JavaConversions.seqAsJavaList(zkUtils.getAllTopics())
             .stream()
-            .map(x -> "kafka." + x)
+            .map(x -> SAMZA_SYSTEM_KAFKA + "." + x)
             .collect(Collectors.toList());
+
+        tables.add(SAMZA_SYSTEM_EVENTHUBS + "." + "teststream1");
+        tables.add(SAMZA_SYSTEM_EVENTHUBS + "." + "teststream2");
+
+        return tables;
     }
 
     @Override
@@ -425,6 +433,28 @@ public class SamzaExecutor implements SqlExecutor {
 
         staticConfigs.put(avroSamzaSqlConfigPrefix + SqlIOConfig.CFG_SAMZA_REL_CONVERTER, "avro");
         staticConfigs.put(avroSamzaSqlConfigPrefix + SqlIOConfig.CFG_REL_SCHEMA_PROVIDER, "config");
+
+        String ehSystemConfigPrefix =
+            String.format(ConfigBasedIOResolverFactory.CFG_FMT_SAMZA_PREFIX, SAMZA_SYSTEM_EVENTHUBS);
+        String ehSamzaSqlConfigPrefix = configIOResolverDomain + String.format("%s.", SAMZA_SYSTEM_EVENTHUBS);
+        staticConfigs.put(ehSystemConfigPrefix + "samza.factory", EventHubSystemFactory.class.getName());
+        staticConfigs.put(ehSystemConfigPrefix + "stream.list", "teststream1,teststream2");
+        staticConfigs.put("streams.teststream1.eventhubs.namespace", "srinieh1");
+        staticConfigs.put("streams.teststream1.eventhubs.entitypath", "teststream1");
+        staticConfigs.put("sensitive.streams.teststream1.eventhubs.sas.keyname", "WriteKey");
+        staticConfigs.put("sensitive.streams.teststream1.eventhubs.sas.token",
+            "BFMZOHEBLbukDJcuMrx1S9HjxjjUW3feXuuc4fhD7oA=");
+        staticConfigs.put("streams.teststream2.eventhubs.namespace", "srinieh1");
+        staticConfigs.put("streams.teststream2.eventhubs.entitypath", "teststream2");
+        staticConfigs.put("sensitive.streams.teststream2.eventhubs.sas.keyname", "WriteKey");
+        staticConfigs.put("sensitive.streams.teststream2.eventhubs.sas.token",
+            "BFMZOHEBLbukDJcuMrx1S9HjxjjUW3feXuuc4fhD7oA=");
+        staticConfigs.put(ehSystemConfigPrefix + "samza.offset.reset", "true");
+        staticConfigs.put(ehSystemConfigPrefix + "samza.offset.default", "oldest");
+
+
+        staticConfigs.put(ehSamzaSqlConfigPrefix + SqlIOConfig.CFG_SAMZA_REL_CONVERTER, "json");
+        staticConfigs.put(ehSamzaSqlConfigPrefix + SqlIOConfig.CFG_REL_SCHEMA_PROVIDER, "config");
 
         String logSystemConfigPrefix =
                 String.format(ConfigBasedIOResolverFactory.CFG_FMT_SAMZA_PREFIX, SAMZA_SYSTEM_LOG);
