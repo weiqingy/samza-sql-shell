@@ -100,6 +100,7 @@ public class SamzaExecutor implements SqlExecutor {
     public List<String> listTables(ExecutionContext context) {
         List<String> tableNames = new ArrayList<String>();
         tableNames.add("kafka.ProfileChangeStream");
+        tableNames.add("kafka.ProfileChangeStream_sink");
 
         return tableNames;
     }

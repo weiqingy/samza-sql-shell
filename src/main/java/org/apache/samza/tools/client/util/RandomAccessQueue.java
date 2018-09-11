@@ -54,7 +54,6 @@ public class RandomAccessQueue<T> {
    */
    public synchronized List<T> consume(int start, int end) {
      List<T> rets = get(start, end);
-     int lowerBound = Math.max(start, 0);
      int upperBound = Math.min(end, m_size - 1);
      m_head = (end + 1) % m_capacity;
      m_size -= (upperBound + 1);
