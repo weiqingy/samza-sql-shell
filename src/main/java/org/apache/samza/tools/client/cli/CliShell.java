@@ -1,5 +1,8 @@
 package org.apache.samza.tools.client.cli;
 
+import com.google.common.base.Joiner;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.samza.SamzaException;
 import org.apache.samza.tools.client.impl.SamzaExecutor;
 import org.apache.samza.tools.client.interfaces.*;
@@ -200,7 +203,7 @@ class CliShell {
     private void commandDescribe(CliCommand command) {
         // TODO: Remove the try catch blcok. Executor is not supposed to report error by exceptions
         try {
-            TableSchema tableSchema = m_executor.getTableScema(m_exeContext, command.getParameters());
+            SamzaSqlSchema tableSchema = m_executor.getTableScema(m_exeContext, command.getParameters());
             printSchema(tableSchema);
         } catch(Exception e) {
             m_writer.println("Execution error: " + e.getMessage());
@@ -412,7 +415,25 @@ class CliShell {
         m_terminal.puts(InfoCmp.Capability.clear_screen);
     }
 
-    private void printSchema(TableSchema tableSchema) {
+    private String getColumnTypeName(SamzaSqlFieldType fieldType) {
+        if (fieldType.isPrimitiveField()) {
+            return fieldType.getTypeName().toString();
+        } else if (fieldType.getTypeName() == SamzaSqlFieldType.TypeName.MAP) {
+            return String.format("MAP(%s)", getColumnTypeName(fieldType.getValueType()));
+        } else if (fieldType.getTypeName() == SamzaSqlFieldType.TypeName.ARRAY) {
+            return String.format("ARRAY(%s)", getColumnTypeName(fieldType.getElementType()));
+        } else {
+            SamzaSqlSchema schema = fieldType.getRowSchema();
+            List<String> fieldTypes = IntStream.range(0, schema.getColumnCount())
+                .mapToObj(i -> schema.getColumnName(i) + " " + getColumnTypeName(schema.getColumTypeName(i)))
+                .collect(Collectors.toList());
+            String rowSchemaValue = Joiner.on(", ").join(fieldTypes);
+            return String.format("STRUCT(%s)", rowSchemaValue);
+        }
+    }
+
+
+    private void printSchema(SamzaSqlSchema tableSchema) {
         if(tableSchema == null) {
             m_writer.write("Failed to get table schema. Error: ");
             m_writer.write(m_executor.getErrorMsg());
@@ -441,7 +462,8 @@ class CliShell {
         }
         seperatorPos = Math.min(seperatorPos, terminalWidth / 2);
         for (int i = 0; i < count; ++i) {
-            String typeName = tableSchema.getColumTypeName(i);
+            SamzaSqlFieldType fieldType = tableSchema.getColumTypeName(i);
+            String typeName = getColumnTypeName(fieldType);
             maxLineLength = Math.max(typeName.length() + seperatorPos, seperatorPos);
         }
         maxLineLength += 6;
@@ -453,7 +475,7 @@ class CliShell {
                 m_writer.write(j < fieldName.length() ? fieldName.charAt(j) : ' ' );
             }
             m_writer.write(" | ");
-            m_writer.println(i == -1 ? "Type" : tableSchema.getColumTypeName(i));
+            m_writer.println(i == -1 ? "Type" : getColumnTypeName(tableSchema.getColumTypeName(i)));
 
             if(i == -1 || i == count - 1) {
                 for(int j = 0; j < maxLineLength; ++j) {

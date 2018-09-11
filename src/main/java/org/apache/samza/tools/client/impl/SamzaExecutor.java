@@ -4,10 +4,17 @@ import java.net.URI;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
+import kafka.utils.ZkUtils;
+import org.I0Itec.zkclient.ZkClient;
+import org.I0Itec.zkclient.ZkConnection;
+import org.apache.avro.Schema;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.commons.lang.Validate;
+import org.apache.samza.SamzaException;
 import org.apache.samza.config.Config;
 import org.apache.samza.config.JobConfig;
 import org.apache.samza.config.JobCoordinatorConfig;
@@ -15,17 +22,22 @@ import org.apache.samza.config.MapConfig;
 import org.apache.samza.config.TaskConfig;
 import org.apache.samza.container.grouper.task.SingleContainerGrouperFactory;
 import org.apache.samza.serializers.StringSerdeFactory;
+import org.apache.samza.sql.avro.AvroRelSchemaProvider;
 import org.apache.samza.sql.avro.ConfigBasedAvroRelSchemaProviderFactory;
 import org.apache.samza.sql.fn.FlattenUdf;
 import org.apache.samza.sql.fn.RegexMatchUdf;
 import org.apache.samza.sql.impl.ConfigBasedIOResolverFactory;
 import org.apache.samza.sql.impl.ConfigBasedUdfResolver;
+import org.apache.samza.sql.interfaces.RelSchemaProvider;
+import org.apache.samza.sql.interfaces.RelSchemaProviderFactory;
 import org.apache.samza.sql.interfaces.SqlIOConfig;
+import org.apache.samza.sql.interfaces.SqlIOResolver;
 import org.apache.samza.sql.planner.QueryPlanner;
 import org.apache.samza.sql.runner.SamzaSqlApplication;
 import org.apache.samza.sql.runner.SamzaSqlApplicationConfig;
 import org.apache.samza.sql.runner.SamzaSqlApplicationRunner;
 import org.apache.samza.sql.testutil.JsonUtil;
+import org.apache.samza.sql.testutil.ReflectionUtils;
 import org.apache.samza.sql.testutil.SqlFileParser;
 import org.apache.samza.standalone.PassthroughJobCoordinatorFactory;
 import org.apache.samza.system.OutgoingMessageEnvelope;
@@ -33,6 +45,7 @@ import org.apache.samza.system.kafka.KafkaSystemFactory;
 import org.apache.samza.tools.avro.AvroSchemaGenRelConverterFactory;
 import org.apache.samza.tools.avro.AvroSerDeFactory;
 import org.apache.samza.tools.client.interfaces.*;
+import org.apache.samza.tools.client.schema.FileSystemAvroRelSchemaProviderFactory;
 import org.apache.samza.tools.client.util.RandomAccessQueue;
 import org.apache.samza.tools.json.JsonRelConverterFactory;
 import org.apache.samza.tools.schemas.PageViewEvent;
@@ -41,6 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Joiner;
 
+import static org.apache.samza.sql.runner.SamzaSqlApplicationConfig.*;
 import static org.apache.samza.tools.client.util.CliUtil.*;
 
 
@@ -98,21 +112,99 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public List<String> listTables(ExecutionContext context) {
-        List<String> tableNames = new ArrayList<String>();
-        tableNames.add("kafka.ProfileChangeStream");
-        tableNames.add("kafka.ProfileChangeStream_sink");
-
-        return tableNames;
+        String address = "localhost:2181";
+        ZkUtils zkUtils = new ZkUtils(new ZkClient(address), new ZkConnection(address), false);
+        return scala.collection.JavaConversions.seqAsJavaList(zkUtils.getAllTopics())
+            .stream()
+            .map(x -> "kafka." + x)
+            .collect(Collectors.toList());
     }
 
     @Override
-    public TableSchema getTableScema(ExecutionContext context, String tableName) {
-        return TableSchemaBuilder.builder().appendColumn("Key", "String")
-                .appendColumn("Name", "String")
-                .appendColumn("NewCompany", "String")
-                .appendColumn("OldCompany", "String")
-                .appendColumn("ProfileChangeTimestamp", "Date")
-                .toTableSchema();
+    public SamzaSqlSchema getTableScema(ExecutionContext context, String tableName) {
+        int execId = m_execIdSeq.incrementAndGet();
+        Map<String, String> staticConfigs = fetchSamzaSqlConfig(execId);
+        Config samzaSqlConfig = new MapConfig(staticConfigs);
+        SqlIOResolver ioResolver = SamzaSqlApplicationConfig.createIOResolver(samzaSqlConfig);
+        SqlIOConfig sourceInfo = ioResolver.fetchSourceInfo(tableName);
+        RelSchemaProvider schemaProvider =
+            initializePlugin("RelSchemaProvider", sourceInfo.getRelSchemaProviderName(), samzaSqlConfig,
+                CFG_FMT_REL_SCHEMA_PROVIDER_DOMAIN,
+                (o, c) -> ((RelSchemaProviderFactory) o).create(sourceInfo.getSystemStream(), c));
+
+        AvroRelSchemaProvider avroSchemaProvider = (AvroRelSchemaProvider) schemaProvider;
+        String schema = avroSchemaProvider.getSchema(sourceInfo.getSystemStream());
+
+        return convertAvroToSamzaSqlSchema(schema);
+    }
+
+    private SamzaSqlSchema convertAvroToSamzaSqlSchema(String schema) {
+        Schema avroSchema = Schema.parse(schema);
+        return getSchema(avroSchema.getFields());
+    }
+
+    private SamzaSqlSchema getSchema(List<Schema.Field> fields) {
+        SamzaSqlSchemaBuilder schemaBuilder = SamzaSqlSchemaBuilder.builder();
+        for (Schema.Field field : fields) {
+            schemaBuilder.addField(field.name(), getFieldType(field.schema()));
+        }
+        return schemaBuilder.toTableSchema();
+    }
+
+    private SamzaSqlFieldType getFieldType(org.apache.avro.Schema schema) {
+
+        switch (schema.getType()) {
+            case ARRAY:
+                return SamzaSqlFieldType.createArrayFieldType(getFieldType(schema.getElementType()));
+            case BOOLEAN:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.BOOLEAN);
+            case DOUBLE:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.DOUBLE);
+            case FLOAT:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.FLOAT);
+            case ENUM:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING);
+            case UNION:
+                // NOTE: We only support Union types when they are used for representing Nullable fields in Avro
+                List<org.apache.avro.Schema> types = schema.getTypes();
+                if (types.size() == 2) {
+                    if (types.get(0).getType() == org.apache.avro.Schema.Type.NULL) {
+                        return getFieldType(types.get(1));
+                    } else if ((types.get(1).getType() == org.apache.avro.Schema.Type.NULL)) {
+                        return getFieldType(types.get(0));
+                    }
+                }
+            case FIXED:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING);
+            case STRING:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING);
+            case BYTES:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.BYTES);
+            case INT:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.INT32);
+            case LONG:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.INT64);
+            case RECORD:
+                return SamzaSqlFieldType.createRowFieldType(getSchema(schema.getFields()));
+            case MAP:
+                return SamzaSqlFieldType.createMapFieldType(getFieldType(schema.getValueType()));
+            default:
+                String msg = String.format("Field Type %s is not supported", schema.getType());
+                LOG.error(msg);
+                throw new SamzaException(msg);
+        }
+    }
+
+    private static <T> T initializePlugin(String pluginName, String plugin, Config staticConfig,
+        String pluginDomainFormat, BiFunction<Object, Config, T> factoryInvoker) {
+        String pluginDomain = String.format(pluginDomainFormat, plugin);
+        Config pluginConfig = staticConfig.subset(pluginDomain);
+        String factoryName = pluginConfig.getOrDefault(CFG_FACTORY, "");
+        Validate.notEmpty(factoryName, String.format("Factory is not set for %s", plugin));
+        Object factory = ReflectionUtils.createInstance(factoryName);
+        Validate.notNull(factory, String.format("Factory creation failed for %s", plugin));
+        LOG.info("Instantiating {} using factory {} with props {}", pluginName, factoryName, pluginConfig);
+        return factoryInvoker.apply(factory, pluginConfig);
     }
 
     @Override
@@ -130,7 +222,7 @@ public class SamzaExecutor implements SqlExecutor {
         m_executors.put(execId, new SamzaExecution(runner, app));
         LOG.debug("Executing sql. Id ", execId);
 
-        return new QueryResult(execId, generateResultSchema(new MapConfig(staticConfigs)));
+        return new QueryResult(execId);
     }
 
     @Override
@@ -253,22 +345,22 @@ public class SamzaExecutor implements SqlExecutor {
         }).collect(Collectors.toList());
     }
 
-    private TableSchema generateResultSchema(Config config) {
-        SamzaSqlApplicationConfig sqlConfig = new SamzaSqlApplicationConfig(config);
-        QueryPlanner planner = new QueryPlanner(
-            sqlConfig.getRelSchemaProviders(),
-            sqlConfig.getInputSystemStreamConfigBySource(),
-            sqlConfig.getUdfMetadata());
-        RelRoot relRoot = planner.plan(sqlConfig.getQueryInfo().get(0).getSelectQuery());
-
-        List<String> colNames = new ArrayList<>();
-        List<String> colTypeNames = new ArrayList<>();
-        for (RelDataTypeField dataTypeField : relRoot.validatedRowType.getFieldList()) {
-            colNames.add(dataTypeField.getName());
-            colTypeNames.add(dataTypeField.getType().toString());
-        }
-        return new TableSchema(colNames, colTypeNames);
-    }
+//    private TableSchema generateResultSchema(Config config) {
+//        SamzaSqlApplicationConfig sqlConfig = new SamzaSqlApplicationConfig(config);
+//        QueryPlanner planner = new QueryPlanner(
+//            sqlConfig.getRelSchemaProviders(),
+//            sqlConfig.getInputSystemStreamConfigBySource(),
+//            sqlConfig.getUdfMetadata());
+//        RelRoot relRoot = planner.plan(sqlConfig.getQueryInfo().get(0).getSelectQuery());
+//
+//        List<String> colNames = new ArrayList<>();
+//        List<String> colTypeNames = new ArrayList<>();
+//        for (RelDataTypeField dataTypeField : relRoot.validatedRowType.getFieldList()) {
+//            colNames.add(dataTypeField.getName());
+//            colTypeNames.add(dataTypeField.getType().toString());
+//        }
+//        return new TableSchema(colNames, colTypeNames);
+//    }
 
     private String[] getFormattedRow(ExecutionContext context, OutgoingMessageEnvelope row) {
         String[] formattedRow = new String[1];
@@ -342,23 +434,11 @@ public class SamzaExecutor implements SqlExecutor {
         String configAvroRelSchemaProviderDomain =
                 String.format(SamzaSqlApplicationConfig.CFG_FMT_REL_SCHEMA_PROVIDER_DOMAIN, "config");
         staticConfigs.put(configAvroRelSchemaProviderDomain + SamzaSqlApplicationConfig.CFG_FACTORY,
-                ConfigBasedAvroRelSchemaProviderFactory.class.getName());
+                FileSystemAvroRelSchemaProviderFactory.class.getName());
 
         staticConfigs.put(
-                configAvroRelSchemaProviderDomain + String.format(ConfigBasedAvroRelSchemaProviderFactory.CFG_SOURCE_SCHEMA,
-                        "kafka", "PageViewStream"), PageViewEvent.SCHEMA$.toString());
-
-        staticConfigs.put(
-                configAvroRelSchemaProviderDomain + String.format(ConfigBasedAvroRelSchemaProviderFactory.CFG_SOURCE_SCHEMA,
-                        "kafka", "ProfileChangeStream"), ProfileChangeEvent.SCHEMA$.toString());
-
-        staticConfigs.put(
-            configAvroRelSchemaProviderDomain + String.format(ConfigBasedAvroRelSchemaProviderFactory.CFG_SOURCE_SCHEMA,
-                "kafka", "ProfileChangeStream1"), ProfileChangeEvent.SCHEMA$.toString());
-
-        staticConfigs.put(
-            configAvroRelSchemaProviderDomain + String.format(ConfigBasedAvroRelSchemaProviderFactory.CFG_SOURCE_SCHEMA,
-                "kafka", "ProfileChangeStream_sink"), ProfileChangeEvent.SCHEMA$.toString());
+                configAvroRelSchemaProviderDomain + FileSystemAvroRelSchemaProviderFactory.CFG_SCHEMA_DIR,
+            "/tmp/schemas/");
 
         return staticConfigs;
     }

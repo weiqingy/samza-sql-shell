@@ -54,7 +54,7 @@ public interface SqlExecutor {
     /**
      * @return null if an error occurs. Prepare for subsequent getErrorMsg call.
      */
-    public TableSchema getTableScema(ExecutionContext context, String tableName);
+    public SamzaSqlSchema getTableScema(ExecutionContext context, String tableName);
 
     /**
      */
