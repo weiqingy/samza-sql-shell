@@ -68,7 +68,9 @@ public class QueryResultExpendedLogView implements CliView {
             while (m_keepRunning) {
                 try {
                     display();
-                    Thread.sleep(m_refreshInterval);
+
+                    if(m_keepRunning)
+                        Thread.sleep(m_refreshInterval);
                 } catch (InterruptedException e) {
                     continue;
                 }
@@ -84,8 +86,8 @@ public class QueryResultExpendedLogView implements CliView {
     private void display() {
         updateTerminalSize();
         int rowsInBuffer = m_executor.getRowCount();
-        clearStatusBar();
         if(rowsInBuffer <= 0 || m_paused) {
+            clearStatusBar();
             drawStatusBar(rowsInBuffer);
             return;
         }
@@ -101,15 +103,17 @@ public class QueryResultExpendedLogView implements CliView {
                 }
             }
             m_terminal.flush();
-            rowsInBuffer = m_executor.getRowCount();
             clearStatusBar();
             drawStatusBar(rowsInBuffer);
 
+            if(!m_keepRunning)
+                return;
             if(m_paused) {
                 clearStatusBar();
                 drawStatusBar(rowsInBuffer);
                 return;
             }
+            rowsInBuffer = m_executor.getRowCount();
         }
     }
 
