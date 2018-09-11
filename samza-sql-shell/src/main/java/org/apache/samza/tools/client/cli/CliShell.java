@@ -1,6 +1,8 @@
 package org.apache.samza.tools.client.cli;
 
 import com.google.common.base.Joiner;
+
+import java.io.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.samza.SamzaException;
@@ -19,9 +21,6 @@ import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
 import org.jline.utils.InfoCmp;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
@@ -106,6 +105,8 @@ class CliShell {
         // put the following line at the end of the method if the line above is enabled
         // m_terminal.puts(InfoCmp.Capability.exit_ca_mode); // tput rmcup
         clearScreen();
+        // We control terminal directly; Forbid any Java System.out.print stuff
+        disableJavaSystemOut();
         m_writer.write(CliConstants.WELCOME_MESSAGE);
 
         // Check if jna.jar exists in class path
@@ -510,6 +511,22 @@ class CliShell {
 
         }
         m_writer.flush();
+    }
+
+    private void disableJavaSystemOut() {
+        PrintStream ps = new PrintStream(new NullOutputStream());
+        System.setOut(ps);
+        System.setErr(ps);
+        System.out.println("Should not see this!");
+        System.err.println("Should not see this!");
+    }
+
+    private class NullOutputStream extends OutputStream {
+        public void close() {}
+        public void flush() {}
+        public void write(byte[] b) {}
+        public void write(byte[] b, int off, int len) {}
+        public void write(int b) {}
     }
 
 
