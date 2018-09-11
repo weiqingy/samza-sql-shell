@@ -20,7 +20,8 @@ public class SamzaSqlFieldType {
     BYTES, // Byte array.
     ARRAY,
     MAP,
-    ROW; // The field is itself a nested row.
+    ROW, // The field is itself a nested row.
+    ANY
   }
 
   public static SamzaSqlFieldType createPrimitiveFieldType(TypeName typeName) {

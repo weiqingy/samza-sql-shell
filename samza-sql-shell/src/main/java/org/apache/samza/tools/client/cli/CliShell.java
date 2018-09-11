@@ -4,6 +4,7 @@ import com.google.common.base.Joiner;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.samza.SamzaException;
+import org.apache.samza.sql.interfaces.UdfMetadata;
 import org.apache.samza.tools.client.impl.SamzaExecutor;
 import org.apache.samza.tools.client.interfaces.*;
 import org.apache.samza.tools.client.util.CliException;
@@ -165,6 +166,10 @@ class CliShell {
 
                     case SHOW_TABLES:
                         commandShowTables(command);
+                        break;
+
+                    case SHOW_FUNCTIONS:
+                        commandShowFunctions(command);
                         break;
 
                     case HELP:
@@ -364,6 +369,25 @@ class CliShell {
         }
         m_writer.flush();
     }
+
+    private void commandShowFunctions(CliCommand command) {
+        List<UdfDisplayInfo> fns = m_executor.listFunctions(m_exeContext);
+
+        if(fns != null) {
+            for(UdfDisplayInfo fn : fns) {
+                m_writer.write(fn.toString());
+                m_writer.write('\n');
+            }
+            m_writer.write('\n');
+        } else {
+            m_writer.write("Failed to list functions. Error: ");
+            m_writer.write(m_executor.getErrorMsg());
+            m_writer.write("\n\n");
+        }
+        m_writer.flush();
+
+    }
+
 
     private CliCommand parseLine(String line) {
         line = CliUtil.trimCommand(line);

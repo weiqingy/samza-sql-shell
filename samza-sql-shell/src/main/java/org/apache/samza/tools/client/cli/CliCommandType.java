@@ -18,6 +18,8 @@ enum CliCommandType {
     SELECT          ("SELECT", "\tExecutes a SQL SELECT query."),
     SET             ("SET", "\tSets a variable."),
     SHOW_TABLES     ("SHOW TABLES", "Shows all available tables."),
+    SHOW_FUNCTIONS  ("SHOW FUNCTIONS", "Shows all available UDFs."),
+
     QUIT            ("QUIT", "\tQuits the shell."),
 
     INVALID_COMMAND ("INVALID_COMMAND", "INVALID_COMMAND");
