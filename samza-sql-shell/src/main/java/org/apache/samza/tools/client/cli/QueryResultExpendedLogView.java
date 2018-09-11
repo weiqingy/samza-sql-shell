@@ -62,8 +62,6 @@ public class QueryResultExpendedLogView implements CliView {
 
         TerminalStatus prevStatus = setupTerminal();
         try {
-
-            updateTerminalSize();
             m_keyReader = new BindingReader(m_terminal.reader());
             m_inputThread = new InputThread();
             m_inputThread.start();
@@ -84,8 +82,8 @@ public class QueryResultExpendedLogView implements CliView {
     // ------------------------------------------------------------------------
 
     private void display() {
-        int rowsInBuffer = m_executor.getRowCount();
         updateTerminalSize();
+        int rowsInBuffer = m_executor.getRowCount();
         clearStatusBar();
         if(rowsInBuffer <= 0 || m_paused) {
             drawStatusBar(rowsInBuffer);
@@ -93,6 +91,7 @@ public class QueryResultExpendedLogView implements CliView {
         }
 
         while(rowsInBuffer > 0) {
+            clearStatusBar();
             int step = 10;
             List<String[]> lines = m_executor.consumeQueryResult(m_exeContext, 0, step - 1);
             for (String[] line : lines) {
@@ -101,14 +100,12 @@ public class QueryResultExpendedLogView implements CliView {
                     m_terminal.writer().write(i == line.length - 1 ? "\n" : " ");
                 }
             }
-
+            m_terminal.flush();
             rowsInBuffer = m_executor.getRowCount();
-            updateTerminalSize();
             clearStatusBar();
             drawStatusBar(rowsInBuffer);
 
             if(m_paused) {
-                updateTerminalSize();
                 clearStatusBar();
                 drawStatusBar(rowsInBuffer);
                 return;
