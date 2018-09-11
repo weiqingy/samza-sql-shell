@@ -23,7 +23,6 @@ import org.apache.samza.config.TaskConfig;
 import org.apache.samza.container.grouper.task.SingleContainerGrouperFactory;
 import org.apache.samza.serializers.StringSerdeFactory;
 import org.apache.samza.sql.avro.AvroRelSchemaProvider;
-import org.apache.samza.sql.avro.ConfigBasedAvroRelSchemaProviderFactory;
 import org.apache.samza.sql.fn.FlattenUdf;
 import org.apache.samza.sql.fn.RegexMatchUdf;
 import org.apache.samza.sql.impl.ConfigBasedIOResolverFactory;
@@ -48,7 +47,6 @@ import org.apache.samza.tools.client.interfaces.*;
 import org.apache.samza.tools.client.schema.FileSystemAvroRelSchemaProviderFactory;
 import org.apache.samza.tools.client.util.RandomAccessQueue;
 import org.apache.samza.tools.json.JsonRelConverterFactory;
-import org.apache.samza.tools.schemas.PageViewEvent;
 import org.apache.samza.tools.schemas.ProfileChangeEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -222,7 +220,7 @@ public class SamzaExecutor implements SqlExecutor {
         m_executors.put(execId, new SamzaExecution(runner, app));
         LOG.debug("Executing sql. Id ", execId);
 
-        return new QueryResult(execId);
+        return new QueryResult(execId, generateResultSchema(new MapConfig(staticConfigs)));
     }
 
     @Override
@@ -326,10 +324,6 @@ public class SamzaExecutor implements SqlExecutor {
         return m_outputData;
     }
 
-    /**
-     *TODO: API for users to pass in data schema
-     */
-
 
     // -- private functions ------------------------------------------
 
@@ -345,22 +339,23 @@ public class SamzaExecutor implements SqlExecutor {
         }).collect(Collectors.toList());
     }
 
-//    private TableSchema generateResultSchema(Config config) {
-//        SamzaSqlApplicationConfig sqlConfig = new SamzaSqlApplicationConfig(config);
-//        QueryPlanner planner = new QueryPlanner(
-//            sqlConfig.getRelSchemaProviders(),
-//            sqlConfig.getInputSystemStreamConfigBySource(),
-//            sqlConfig.getUdfMetadata());
-//        RelRoot relRoot = planner.plan(sqlConfig.getQueryInfo().get(0).getSelectQuery());
-//
-//        List<String> colNames = new ArrayList<>();
-//        List<String> colTypeNames = new ArrayList<>();
-//        for (RelDataTypeField dataTypeField : relRoot.validatedRowType.getFieldList()) {
-//            colNames.add(dataTypeField.getName());
-//            colTypeNames.add(dataTypeField.getType().toString());
-//        }
-//        return new TableSchema(colNames, colTypeNames);
-//    }
+    private SamzaSqlSchema generateResultSchema(Config config) {
+        SamzaSqlApplicationConfig sqlConfig = new SamzaSqlApplicationConfig(config);
+        QueryPlanner planner = new QueryPlanner(
+            sqlConfig.getRelSchemaProviders(),
+            sqlConfig.getInputSystemStreamConfigBySource(),
+            sqlConfig.getUdfMetadata());
+        RelRoot relRoot = planner.plan(sqlConfig.getQueryInfo().get(0).getSelectQuery());
+
+        List<String> colNames = new ArrayList<>();
+        List<SamzaSqlFieldType> colTypeNames = new ArrayList<>();
+        for (RelDataTypeField dataTypeField : relRoot.validatedRowType.getFieldList()) {
+            colNames.add(dataTypeField.getName());
+            // TODO: colTypeNames.add(dataTypeField.getType().toString());
+            colTypeNames.add(null);
+        }
+        return new SamzaSqlSchema(colNames, colTypeNames);
+    }
 
     private String[] getFormattedRow(ExecutionContext context, OutgoingMessageEnvelope row) {
         String[] formattedRow = new String[1];
