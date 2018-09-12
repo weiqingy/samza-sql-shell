@@ -59,5 +59,4 @@ Input your SQL statements in the shell:
     insert into kafka.ProfileChangeStream_sink select * from kafka.ProfileChangeStream
     select * from kafka.ProfileChangeStream_sink
     ...
-
-For now, users need to put schema files under "/tmp/schemas/", but samza-sql-shell will enable users to configure the path of their schema files soon.
+    
