@@ -16,7 +16,6 @@ public class CliEnvironment {
         m_messageFormat = messageFormat;
     }
 
-
     public ExecutionContext generateExecutionContext() {
         ExecutionContext exeCtxt = new ExecutionContext();
         exeCtxt.setMessageFormat(m_messageFormat);
@@ -50,7 +49,6 @@ public class CliEnvironment {
 
         return 0;
     }
-
 
     public void printAll(PrintWriter writer) {
         writer.print(m_messageFormatEnvVar);
