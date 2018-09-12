@@ -189,7 +189,11 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public NonQueryResult executeNonQuery(ExecutionContext context,  URI sqlFile) {
-        return executeNonQuery(context, SqlFileParser.parseSqlFile(sqlFile.getPath()));
+        List<String> executedStmts = SqlFileParser.parseSqlFile(sqlFile.getPath());
+        if (executedStmts == null || executedStmts.isEmpty() || validateExecutedStmts(executedStmts)) {
+            return new NonQueryResult(m_execIdSeq.incrementAndGet(), false, null);
+        }
+        return executeNonQuery(context, executedStmts);
     }
 
     @Override
@@ -364,6 +368,15 @@ public class SamzaExecutor implements SqlExecutor {
                 return sql;
             }
         }).collect(Collectors.toList());
+    }
+
+    private boolean validateExecutedStmts(List<String> statements) {
+        for (String sql: statements) {
+            if (!sql.toLowerCase().startsWith("insert")) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private SamzaSqlSchema generateResultSchema(Config config) {

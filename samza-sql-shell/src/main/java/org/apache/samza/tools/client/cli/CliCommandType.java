@@ -11,7 +11,7 @@ import java.util.List;
 
 enum CliCommandType {
     CLEAR           ("CLEAR", "\tClears the screen.", "CLEAR"),
-    DESCRIBE        ("DESCRIBE", "Describes a table.", "Usage :DESCRIBE <table name>"),
+    DESCRIBE        ("DESCRIBE", "Describes a table.", "Usage: DESCRIBE <table name>"),
     EXECUTE         ("EXECUTE", "\tExecute a sql file.", "EXECUTE <URI of a sql file>"),
     INSERT_INTO     ("INSERT INTO", "Executes a SQL INSERT INTO.", "INSERT INTO uses a standard streaming SQL syntax."),
     HELP            ("HELP", "\tDisplays this help message.", "Usage: HELP [command]"),
