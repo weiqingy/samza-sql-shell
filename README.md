@@ -22,7 +22,8 @@ Currently SamzaSQL shell depends on Samza version [0.14.1](http://samza.apache.o
     
 samza-sql-shell build creates a tar-ball under samza-sql-shell/build/distributions/. Untar it by running the below commands.
 
-    tar -xvzf samza-sql-shell/build/distributions/*.tgz -C samza-sql-shell/build/distributions/
+    cd samza-sql-shell/build/distributions/
+    tar -xvzf *.tgz
 
 ## Populate data
 
@@ -48,15 +49,15 @@ For example, you can use [samza-tools-0.14.1](http://samza.apache.org/startup/do
     ./scripts/generate-kafka-events.sh -t ProfileChangeStream -e ProfileChange
 
 ## Run SamzaSQL shell
-Include samza-sql-shell jar and its dependencies in classpath. 
 
-    cd samza-sql-shell
-    java -Dlog4j.configuration=file:samza-sql-shell/src/main/resources/log4j.xml -cp samza-sql-shell/build/libs/samza-sql-shell-1.0-SNAPSHOT.jar:samza-sql-shell/build/distributions/samza-sql-shell-1.0-SNAPSHOT/libs/*  org.apache.samza.tools.client.cli.Main
+    cd samza-sql-shell-<version>
+    ./scripts/samza-shell.sh
     
 Input your SQL statements in the shell:
 
     select * from kafka.ProfileChangeStream
     insert into kafka.ProfileChangeStream_sink select * from kafka.ProfileChangeStream
     select * from kafka.ProfileChangeStream_sink
+    ...
 
 For now, users need to put schema files under "/tmp/schemas/", but samza-sql-shell will enable users to configure the path of their schema files soon.

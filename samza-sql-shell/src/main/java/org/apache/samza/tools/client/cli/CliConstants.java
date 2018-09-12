@@ -13,7 +13,7 @@ class CliConstants {
     public static final String WELCOME_MESSAGE;
     static {
 
-        // TODO: Draw a beatiful ASCII art here!
+        // TODO: Draw a beautiful ASCII art here!
         WELCOME_MESSAGE =
 "      ___           ___           ___           ___           ___ \n" +
 "     /  /\\         /  /\\         /  /\\         /__/\\         /  /\\ \n" +

@@ -485,10 +485,6 @@ public class SamzaExecutor implements SqlExecutor {
                 configAvroRelSchemaProviderDomain + FileSystemAvroRelSchemaProviderFactory.CFG_SCHEMA_DIR,
             "/tmp/schemas/");
 
-        staticConfigs.put(
-            configAvroRelSchemaProviderDomain + String.format(ConfigBasedAvroRelSchemaProviderFactory.CFG_SOURCE_SCHEMA,
-                "kafka", "ProfileChangeStream_sink"), ProfileChangeEvent.SCHEMA$.toString());
-
         return staticConfigs;
     }
 }
