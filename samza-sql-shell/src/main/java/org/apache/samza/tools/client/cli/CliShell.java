@@ -222,41 +222,34 @@ class CliShell {
     }
 
     private void commandSet(CliCommand command) {
-        ExecutionContext exeContext = m_env.generateExecutionContext();
         String param = command.getParameters();
-        if(param == null) {
-            m_writer.println("OUTPUT=" + exeContext.getMessageFormat());
+        if(param == null || param.isEmpty()) {
+            m_env.printAll(m_writer);
+            return;
+        }
+        String[] params = param.split("=");
+        if(params.length != 2) {
+            m_writer.println(command.getCommandType().getUsage());
             m_writer.println();
             m_writer.flush();
             return;
         }
-        param = param.toUpperCase();
-        String[] params = param.split("=");
-        if(params.length != 2) {
-            m_writer.println("Usage: SET VAR=VAL\n");
-            m_writer.flush();
-            return;
+
+        int ret = m_env.setEnvironmentVariable(params[0], params[1]);
+        if(ret == 0) {
+            m_writer.print(params[0]);
+            m_writer.print(" set to ");
+            m_writer.println(params[1]);
+        } else if(ret == -1) {
+            m_writer.print("Unknow variable: ");
+            m_writer.println(params[0]);
+        } else if(ret == -2){
+            m_writer.print("Invalid value: ");
+            m_writer.println(params[1]);
         }
 
-        // TODO: When more set parameters come, move the code to a seperate class
-        switch (params[0]) {
-            case "OUTPUT":
-                if(params[1].equals("PRETTY")) {
-                    exeContext.setMessageFormat(ExecutionContext.MessageFormat.PRETTY);
-                }
-                else if (params[1].equals("COMPACT")) {
-                    exeContext.setMessageFormat(ExecutionContext.MessageFormat.COMPACT);
-                }
-                else {
-                    m_writer.println("possible value for OUTPUT: PRETTY, COMPACT\n");
-                    m_writer.flush();
-                }
-                break;
-            default:
-                m_writer.println("Current supported variables:\n");
-                m_writer.println("OUTPUT\t\tPRETTY|COMPACT\n");
-                m_writer.flush();
-        }
+        m_writer.println();
+        m_writer.flush();
     }
 
     private  void commandExecuteFile(CliCommand command) {
