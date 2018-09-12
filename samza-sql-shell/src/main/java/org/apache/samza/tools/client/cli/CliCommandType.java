@@ -20,6 +20,7 @@ enum CliCommandType {
     SHOW_TABLES     ("SHOW TABLES", "Shows all available tables.", "Usage: SHOW TABLES <table name>"),
     SHOW_FUNCTIONS  ("SHOW FUNCTIONS", "Shows all available UDFs.", "SHOW FUNCTION"),
 
+    EXIT            ("EXIT", "\tExits the shell.", "Exit"),
     QUIT            ("QUIT", "\tQuits the shell.", "QUIT"),
 
     INVALID_COMMAND ("INVALID_COMMAND", "INVALID_COMMAND", "INVALID_COMMAND");

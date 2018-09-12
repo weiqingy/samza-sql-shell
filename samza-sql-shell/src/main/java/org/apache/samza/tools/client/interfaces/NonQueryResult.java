@@ -33,7 +33,7 @@ public class NonQueryResult {
         return m_submittedStmts;
     }
 
-    public List<String> geNonSubmittedStmts() {
+    public List<String> getNonSubmittedStmts() {
         return m_nonSubmittedStmts;
     }
 }

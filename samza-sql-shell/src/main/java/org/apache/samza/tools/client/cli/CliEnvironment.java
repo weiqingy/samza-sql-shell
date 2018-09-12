@@ -54,7 +54,7 @@ public class CliEnvironment {
         writer.print(m_messageFormatEnvVar);
         writer.print('=');
         writer.println(m_messageFormat.name());
-        
+
         writer.println();
         writer.flush();
     }

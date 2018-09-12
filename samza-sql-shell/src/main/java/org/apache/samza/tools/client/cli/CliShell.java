@@ -148,6 +148,7 @@ class CliShell {
                         break;
 
                     case QUIT:
+                    case EXIT:
                         commandQuit();
                         break;
 
@@ -255,7 +256,7 @@ class CliShell {
 
     private  void commandExecuteFile(CliCommand command) {
         String parameters = command.getParameters();
-        if(parameters == null || parameters.isEmpty()) {
+        if (parameters == null || parameters.isEmpty()) {
             m_writer.println("Usage: execute <fileuri>\n");
             m_writer.flush();
             return;
@@ -268,16 +269,48 @@ class CliShell {
             valid = file.exists();
         } catch (URISyntaxException e) {
         }
-        if(!valid) {
+        if (!valid) {
             m_writer.println("Invalid URI.\n");
             m_writer.flush();
             return;
         }
 
-        NonQueryResult nonQueryResult = m_executor.executeNonQuery(m_env.generateExecutionContext(), uri);
-        if(nonQueryResult.succeeded()) {
-            List<String> executedStatements = nonQueryResult.getExecutedStmts();
+        NonQueryResult nonQueryResult = null;
+        try {
+            nonQueryResult = m_executor.executeNonQuery(m_env.generateExecutionContext(), uri);
+        } catch (Exception e) {
+            m_writer.println("Execution error: " + e.getMessage());
+            m_writer.println("Exception: " + e.getClass().getName());
+            m_writer.println();
+            m_writer.flush();
+            return;
         }
+
+        List<String> submittedStmts = nonQueryResult.getSubmittedStmts();
+        List<String> nonsubmittedStmts = nonQueryResult.getNonSubmittedStmts();
+
+        m_writer.println("Sql file submitted. Execution ID: " + nonQueryResult.getExecutionId());
+        m_writer.println("Submitted statements: \n");
+        if (submittedStmts == null || submittedStmts.size() == 0) {
+            m_writer.println("\tNone.");
+        } else {
+            for (String statement : submittedStmts) {
+                m_writer.print("\t");
+                m_writer.println(statement);
+            }
+        }
+        m_writer.println("Statements NOT submitted: \n");
+        if (nonsubmittedStmts == null || nonsubmittedStmts.size() == 0) {
+            m_writer.println("\tNone.");
+        } else {
+            for(String statement : nonsubmittedStmts) {
+                m_writer.print("\t");
+                m_writer.println(statement);
+            }
+        }
+        m_writer.println();
+        m_writer.println("Note: All query statements in a sql file are NOT submitted.");
+        m_writer.flush();
     }
 
     private void commandInsertInto(CliCommand command) {
