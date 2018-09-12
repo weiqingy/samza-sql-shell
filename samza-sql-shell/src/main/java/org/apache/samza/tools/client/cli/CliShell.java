@@ -300,17 +300,16 @@ class CliShell {
             m_writer.println();
         }
 
-        if (nonsubmittedStmts == null || nonsubmittedStmts.size() == 0) {
-            m_writer.println("\tNone.");
-        } else {
+        if (nonsubmittedStmts != null && nonsubmittedStmts.size() != 0) {
             m_writer.println("Statements NOT submitted: \n");
+            m_writer.println("\tNone.");
             for(String statement : nonsubmittedStmts) {
                 m_writer.print("\t");
                 m_writer.println(statement);
             }
+            m_writer.println();
         }
 
-        m_writer.println();
         m_writer.println("Note: All query statements in a sql file are NOT submitted.");
         m_writer.println();
         m_writer.flush();
