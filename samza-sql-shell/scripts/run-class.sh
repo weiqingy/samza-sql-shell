@@ -73,6 +73,10 @@ if [ -z "$JVM_PERFORMANCE_OPTS" ]; then
   JVM_PERFORMANCE_OPTS="-server -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:+DisableExplicitGC -Djava.awt.headless=true"
 fi
 
+# JVM other options, e.g. disable runtime access warnings
+if [ -z "$JVM_OTHER_OPTS" ]; then
+  JVM_OTHER_OPTS="--add-opens java.base/java.nio=ALL-UNNAMED"
+fi
 
 while [ $# -gt 0 ]; do
   COMMAND=$1
@@ -100,8 +104,8 @@ done
 
 # Launch mode
 if [ "x$DAEMON_MODE" = "xtrue" ]; then
-  nohup $JAVA $HEAP_OPTS $JVM_PERFORMANCE_OPTS $GC_LOG_OPTS $JMX_OPTS $LOG4J_OPTS -cp $CLASSPATH $OPTS "$@" > "$CONSOLE_OUTPUT_FILE" \
+  nohup $JAVA $JVM_OTHER_OPTS $HEAP_OPTS $JVM_PERFORMANCE_OPTS $GC_LOG_OPTS $JMX_OPTS $LOG4J_OPTS -cp $CLASSPATH $OPTS "$@" > "$CONSOLE_OUTPUT_FILE" \
 	2>&1 < /dev/null & echo $! > $base_dir/../run.pid
 else
-  exec $JAVA $HEAP_OPTS $JVM_PERFORMANCE_OPTS $GC_LOG_OPTS $JMX_OPTS $LOG4J_OPTS -cp $CLASSPATH $OPTS "$@"
+  exec $JAVA $JVM_OTHER_OPTS $HEAP_OPTS $JVM_PERFORMANCE_OPTS $GC_LOG_OPTS $JMX_OPTS $LOG4J_OPTS -cp $CLASSPATH $OPTS "$@"
 fi

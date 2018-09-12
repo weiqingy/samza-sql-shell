@@ -7,8 +7,10 @@ else
   base_dir=$(dirname $0)
 fi
 
+parentdir="$(dirname "$base_dir")"
+
 if [ "x$LOG4J_OPTS" = "x" ]; then
-    export LOG4J_OPTS="-Dlog4j.configuration=file://$base_dir/../config/samza-shell-log4j.xml"
+    export LOG4J_OPTS="-Dlog4j.configuration=file:$parentdir/config/samza-shell-log4j.xml"
 fi
 
 if [ "x$HEAP_OPTS" = "x" ]; then

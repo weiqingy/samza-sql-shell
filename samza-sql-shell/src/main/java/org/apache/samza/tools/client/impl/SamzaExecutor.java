@@ -23,6 +23,7 @@ import org.apache.samza.config.TaskConfig;
 import org.apache.samza.container.grouper.task.SingleContainerGrouperFactory;
 import org.apache.samza.serializers.StringSerdeFactory;
 import org.apache.samza.sql.avro.AvroRelSchemaProvider;
+import org.apache.samza.sql.avro.ConfigBasedAvroRelSchemaProviderFactory;
 import org.apache.samza.sql.fn.FlattenUdf;
 import org.apache.samza.sql.fn.RegexMatchUdf;
 import org.apache.samza.sql.impl.ConfigBasedIOResolverFactory;
@@ -453,6 +454,10 @@ public class SamzaExecutor implements SqlExecutor {
         staticConfigs.put(
                 configAvroRelSchemaProviderDomain + FileSystemAvroRelSchemaProviderFactory.CFG_SCHEMA_DIR,
             "/tmp/schemas/");
+
+        staticConfigs.put(
+            configAvroRelSchemaProviderDomain + String.format(ConfigBasedAvroRelSchemaProviderFactory.CFG_SOURCE_SCHEMA,
+                "kafka", "ProfileChangeStream_sink"), ProfileChangeEvent.SCHEMA$.toString());
 
         return staticConfigs;
     }

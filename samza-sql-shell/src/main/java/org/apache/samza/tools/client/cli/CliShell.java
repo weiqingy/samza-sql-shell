@@ -351,6 +351,7 @@ class CliShell {
             m_writer.write("Failed to query. Error: ");
             m_writer.write(e.getMessage());
             m_writer.write("\n\n");
+            e.printStackTrace();
         }
     }
 
