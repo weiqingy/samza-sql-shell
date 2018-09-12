@@ -35,14 +35,10 @@ class CliShell {
     private final LineReader m_lineReader;
     private final String m_1stPrompt;
     private final SqlExecutor m_executor;
-    private ExecutionContext m_exeContext;
+    private CliEnvironment m_env;
     private Map<Integer, String> m_executions = new HashMap<>();
 
     private boolean m_keepRunning = true;
-
-    // TODO: HACK CODE; REMOVE LATER
-    private volatile boolean m_executorRunning_TMP = false;
-
 
     public CliShell() {
         // Terminal
@@ -77,17 +73,17 @@ class CliShell {
                 .toAnsi();
 
         // Execution context and executor
-        m_exeContext = new ExecutionContext();
+        m_env = new CliEnvironment();
         m_executor = new SamzaExecutor();
-        m_executor.start(m_exeContext);
+        m_executor.start(m_env.generateExecutionContext());
     }
 
     public Terminal getTerminal() {
         return m_terminal;
     }
 
-    public ExecutionContext getExecutionContext() {
-        return m_exeContext;
+    public CliEnvironment getEnvironment() {
+        return m_env;
     }
 
     public SqlExecutor getExecutor() {
@@ -106,7 +102,7 @@ class CliShell {
         // m_terminal.puts(InfoCmp.Capability.exit_ca_mode); // tput rmcup
         clearScreen();
         // We control terminal directly; Forbid any Java System.out.print stuff
-        disableJavaSystemOut();
+        disableJavaSystemOutAndErr();
         m_writer.write(CliConstants.WELCOME_MESSAGE);
 
         // Check if jna.jar exists in class path
@@ -190,7 +186,7 @@ class CliShell {
 
         m_writer.write("Cleaning up... ");
         m_writer.flush();
-        m_executor.stop(m_exeContext);
+        m_executor.stop(m_env.generateExecutionContext());
 
         try {
             m_terminal.close();
@@ -208,8 +204,14 @@ class CliShell {
 
     private void commandDescribe(CliCommand command) {
         // TODO: Remove the try catch blcok. Executor is not supposed to report error by exceptions
+        String parameters = command.getParameters();
+        if(parameters == null || parameters.isEmpty()) {
+            m_writer.println("Usage: DESCRIBE <TableName>\n");
+            return;
+        }
+
         try {
-            SamzaSqlSchema tableSchema = m_executor.getTableScema(m_exeContext, command.getParameters());
+            SamzaSqlSchema tableSchema = m_executor.getTableScema(m_env.generateExecutionContext(), parameters);
             printSchema(tableSchema);
         } catch(Exception e) {
             m_writer.println("Execution error: " + e.getMessage());
@@ -219,9 +221,10 @@ class CliShell {
     }
 
     private void commandSet(CliCommand command) {
+        ExecutionContext exeContext = m_env.generateExecutionContext();
         String param = command.getParameters();
         if(param == null) {
-            m_writer.println("OUTPUT=" + m_exeContext.getMessageFormat());
+            m_writer.println("OUTPUT=" + exeContext.getMessageFormat());
             m_writer.println();
             m_writer.flush();
             return;
@@ -238,10 +241,10 @@ class CliShell {
         switch (params[0]) {
             case "OUTPUT":
                 if(params[1].equals("PRETTY")) {
-                    m_exeContext.setMessageFormat(ExecutionContext.MessageFormat.PRETTY);
+                    exeContext.setMessageFormat(ExecutionContext.MessageFormat.PRETTY);
                 }
                 else if (params[1].equals("COMPACT")) {
-                    m_exeContext.setMessageFormat(ExecutionContext.MessageFormat.COMPACT);
+                    exeContext.setMessageFormat(ExecutionContext.MessageFormat.COMPACT);
                 }
                 else {
                     m_writer.println("possible value for OUTPUT: PRETTY, COMPACT\n");
@@ -277,7 +280,7 @@ class CliShell {
         }
 
         try {
-            NonQueryResult nonQueryResult = m_executor.executeNonQuery(m_exeContext, uri);
+            NonQueryResult nonQueryResult = m_executor.executeNonQuery(m_env.generateExecutionContext(), uri);
         }
         catch (Exception e) {
             m_writer.println("Execution error: " + e.getMessage());
@@ -289,7 +292,7 @@ class CliShell {
     private void commandInsertInto(CliCommand command) {
         // TODO: Remove the try catch blcok. Executor is not supposed to report error by exceptions
         try {
-            NonQueryResult result = m_executor.executeNonQuery(m_exeContext,
+            NonQueryResult result = m_executor.executeNonQuery(m_env.generateExecutionContext(),
                     Collections.singletonList(command.getFullCommand()));
 
             if (result.succeeded()) {
@@ -340,13 +343,14 @@ class CliShell {
         m_terminal.handle(Terminal.Signal.INT, handler_INT);
         m_terminal.handle(Terminal.Signal.QUIT, handler_QUIT);
 */
+        ExecutionContext exeContext = m_env.generateExecutionContext();
         try {
-            QueryResult queryResult = m_executor.executeQuery(m_exeContext, command.getFullCommand());
+            QueryResult queryResult = m_executor.executeQuery(exeContext, command.getFullCommand());
             m_executions.put(queryResult.getExecutionId(), fullCmd);
 
             CliView view = new QueryResultExpendedLogView();
             view.open(this, queryResult);
-            m_executor.stopExecution(m_exeContext, queryResult.getExecutionId());
+            m_executor.stopExecution(exeContext, queryResult.getExecutionId());
         } catch (SamzaException e) {
             m_writer.write("Failed to query. Error: ");
             m_writer.write(e.getMessage());
@@ -356,7 +360,7 @@ class CliShell {
     }
 
     private void commandShowTables(CliCommand command) {
-        List<String> tableNames = m_executor.listTables(m_exeContext);
+        List<String> tableNames = m_executor.listTables(m_env.generateExecutionContext());
 
         if(tableNames != null) {
             for(String tableName : tableNames) {
@@ -373,7 +377,7 @@ class CliShell {
     }
 
     private void commandShowFunctions(CliCommand command) {
-        List<UdfDisplayInfo> fns = m_executor.listFunctions(m_exeContext);
+        List<UdfDisplayInfo> fns = m_executor.listFunctions(m_env.generateExecutionContext());
 
         if(fns != null) {
             for(UdfDisplayInfo fn : fns) {
@@ -514,7 +518,7 @@ class CliShell {
         m_writer.flush();
     }
 
-    private void disableJavaSystemOut() {
+    private void disableJavaSystemOutAndErr() {
         PrintStream ps = new PrintStream(new NullOutputStream());
         System.setOut(ps);
         System.setErr(ps);
@@ -528,19 +532,5 @@ class CliShell {
         public void write(byte[] b) {}
         public void write(byte[] b, int off, int len) {}
         public void write(int b) {}
-    }
-
-
-    // TODO: REMOVE LATER; Hack for temp select execution
-    private void handleSignal(Terminal.Signal signal) {
-        switch (signal) {
-            case INT:
-            case QUIT:
-                m_executor.stop(m_exeContext);
-                m_terminal.writer().println("User cancelled query. \n");
-                m_terminal.flush();
-                m_executorRunning_TMP = false;
-                break;
-        }
     }
 }

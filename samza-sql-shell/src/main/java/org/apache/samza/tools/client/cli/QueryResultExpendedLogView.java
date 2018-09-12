@@ -58,7 +58,7 @@ public class QueryResultExpendedLogView implements CliView {
         m_queryResult = queryResult;
         m_terminal = shell.getTerminal();
         m_executor = shell.getExecutor();
-        m_exeContext = shell.getExecutionContext();
+        m_exeContext = shell.getEnvironment().generateExecutionContext();
 
         TerminalStatus prevStatus = setupTerminal();
         try {
