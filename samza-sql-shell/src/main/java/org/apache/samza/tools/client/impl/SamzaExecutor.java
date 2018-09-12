@@ -96,6 +96,7 @@ public class SamzaExecutor implements SqlExecutor {
     private ConcurrentHashMap<Integer, SamzaExecution> m_executors = new ConcurrentHashMap<>();
     private static RandomAccessQueue<OutgoingMessageEnvelope> m_outputData =
         new RandomAccessQueue<>(OutgoingMessageEnvelope.class, RANDOM_ACCESS_QUEUE_CAPACITY);
+    private String m_lastestErrorMsg = "";
 
     // -- implementation of SqlExecutor ------------------------------------------
 
@@ -189,11 +190,13 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public NonQueryResult executeNonQuery(ExecutionContext context,  URI sqlFile) {
+        m_lastestErrorMsg = "";
         List<String> executedStmts = SqlFileParser.parseSqlFile(sqlFile.getPath());
-        if (executedStmts == null || executedStmts.isEmpty() || validateExecutedStmts(executedStmts)) {
-            return new NonQueryResult(m_execIdSeq.incrementAndGet(), false, null);
-        }
-        return executeNonQuery(context, executedStmts);
+        List<String> submittedStmts = new ArrayList<>();
+        List<String> nonSubmittedStmts = new ArrayList<>();
+        validateExecutedStmts(executedStmts, submittedStmts, nonSubmittedStmts);
+        NonQueryResult result =  executeNonQuery(context, submittedStmts);
+        return new NonQueryResult(result.getExecutionId(), result.succeeded(), submittedStmts, nonSubmittedStmts);
     }
 
     @Override
@@ -262,7 +265,7 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public String getErrorMsg() {
-        throw new ExecutionException("not supported");
+        return m_lastestErrorMsg;
     }
 
     @Override
@@ -370,13 +373,15 @@ public class SamzaExecutor implements SqlExecutor {
         }).collect(Collectors.toList());
     }
 
-    private boolean validateExecutedStmts(List<String> statements) {
+    private void validateExecutedStmts(List<String> statements, List<String> submittedStmts,
+        List<String> nonSubmittedStmts) {
         for (String sql: statements) {
             if (!sql.toLowerCase().startsWith("insert")) {
-                return false;
+                nonSubmittedStmts.add(sql);
+            } else {
+                submittedStmts.add(sql);
             }
         }
-        return true;
     }
 
     private SamzaSqlSchema generateResultSchema(Config config) {

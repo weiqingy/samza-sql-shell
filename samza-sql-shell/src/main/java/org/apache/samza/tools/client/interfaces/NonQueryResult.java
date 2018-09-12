@@ -6,19 +6,20 @@ import java.util.List;
 public class NonQueryResult {
     private int m_execId;
     private boolean m_success;
-    private List<String> m_executedStmts;
+    private List<String> m_submittedStmts;
+    private List<String> m_nonSubmittedStmts;
 
     public NonQueryResult(int execId, boolean success) {
         m_execId = execId;
         m_success = success;
     }
 
-    public NonQueryResult(int execId, boolean success, List<String> executedStmts) {
+    public NonQueryResult(int execId, boolean success, List<String> submittedStmts, List<String> nonSubmittedStmts) {
         m_execId = execId;
         m_success = success;
-        m_executedStmts = executedStmts;
+        m_submittedStmts = submittedStmts;
+        m_nonSubmittedStmts = nonSubmittedStmts;
     }
-
 
     public int getExecutionId() {
         return m_execId;
@@ -28,7 +29,11 @@ public class NonQueryResult {
         return m_success;
     }
 
-    public List<String> getExecutedStmts() {
-        return m_executedStmts;
+    public List<String> getSubmittedStmts() {
+        return m_submittedStmts;
+    }
+
+    public List<String> geNonSubmittedStmts() {
+        return m_nonSubmittedStmts;
     }
 }
