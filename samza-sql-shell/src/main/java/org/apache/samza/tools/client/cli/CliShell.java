@@ -321,23 +321,41 @@ class CliShell {
                     Collections.singletonList(command.getFullCommand()));
 
             if (result.succeeded()) {
-                m_writer.write("Execution submitted successfully. Id: ");
-                m_writer.write(String.valueOf(result.getExecutionId()));
-                m_writer.write("  \n");
+                m_writer.print("Execution submitted successfully. Id: ");
+                m_writer.println(String.valueOf(result.getExecutionId()));
+//                m_writer.println();
             } else {
                 m_writer.write("Execution failed to submit. Error: ");
                 m_writer.write(m_executor.getErrorMsg());
                 m_writer.println();
+                m_writer.flush();
+                return;
             }
         }
         catch(Exception e) {
-            m_writer.println("Execution error: " + e.getMessage());
             m_writer.println("Exception: " + e.getClass().getName());
+            m_writer.println("Execution error: " + e.getMessage());
             m_writer.println();
+            m_writer.flush();
+            return;
         }
+
+        // For Demo; Doesn't allow more operation unless the insert into is cancelled
+        m_insertIntoRunning = true;
+        m_writer.println("Press Ctrl + C to cancel the execution...");
+        m_writer.flush();
+        Terminal.SignalHandler handler_INT = m_terminal.handle(Terminal.Signal.INT, this::handleSignal);
+        while(m_insertIntoRunning) {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                break;
+            }
+        }
+        // Restore original Ctrl C handler
+        m_terminal.handle(Terminal.Signal.INT, handler_INT);
         m_writer.println();
         m_writer.flush();
-
     }
 
     private void commandQuit() {
@@ -561,5 +579,16 @@ class CliShell {
         public void write(byte[] b) {}
         public void write(byte[] b, int off, int len) {}
         public void write(int b) {}
+    }
+
+    // TODO: REMOVE
+    // Hack for demo
+    private volatile boolean m_insertIntoRunning = false;
+    private void handleSignal(Terminal.Signal signal) {
+        switch (signal) {
+            case INT:
+                m_insertIntoRunning = false;
+                break;
+        }
     }
 }
