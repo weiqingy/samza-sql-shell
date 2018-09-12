@@ -302,7 +302,6 @@ class CliShell {
 
         if (nonsubmittedStmts != null && nonsubmittedStmts.size() != 0) {
             m_writer.println("Statements NOT submitted: \n");
-            m_writer.println("\tNone.");
             for(String statement : nonsubmittedStmts) {
                 m_writer.print("\t");
                 m_writer.println(statement);
