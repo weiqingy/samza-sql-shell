@@ -274,13 +274,9 @@ class CliShell {
             return;
         }
 
-        try {
-            NonQueryResult nonQueryResult = m_executor.executeNonQuery(m_env.generateExecutionContext(), uri);
-        }
-        catch (Exception e) {
-            m_writer.println("Execution error: " + e.getMessage());
-            m_writer.println("Exception: " + e.getClass().getName());
-            m_writer.println();
+        NonQueryResult nonQueryResult = m_executor.executeNonQuery(m_env.generateExecutionContext(), uri);
+        if(nonQueryResult.succeeded()) {
+            List<String> executedStatements = nonQueryResult.getExecutedStmts();
         }
     }
 
@@ -316,28 +312,6 @@ class CliShell {
 
     private void commandSelect(CliCommand command) {
         String fullCmd = command.getFullCommand();
-
-/*
-        // This code snippet is for temporary select implementation purpose
-        // For now the executor prints out to screen directly which is unacceptable
-        Terminal.SignalHandler handler_INT = m_terminal.handle(Terminal.Signal.INT, this::handleSignal);
-        Terminal.SignalHandler handler_QUIT = m_terminal.handle(Terminal.Signal.QUIT, this::handleSignal);;
-
-        // TODO: Remove the try catch blcok. Executor is not supposed to report error by exceptions
-        try {
-            m_executor.executeQuery(m_exeContext, fullCmd);
-            m_executorRunning_TMP = true;
-            while(m_executorRunning_TMP) {
-                Thread.sleep(50);
-            }
-        } catch(Exception e) {
-            m_terminal.writer().println("Execution error: " + e.getMessage());
-            m_terminal.writer().println("Exception: " + e.getClass().getName());
-        }
-
-        m_terminal.handle(Terminal.Signal.INT, handler_INT);
-        m_terminal.handle(Terminal.Signal.QUIT, handler_QUIT);
-*/
         ExecutionContext exeContext = m_env.generateExecutionContext();
         try {
             QueryResult queryResult = m_executor.executeQuery(exeContext, command.getFullCommand());
