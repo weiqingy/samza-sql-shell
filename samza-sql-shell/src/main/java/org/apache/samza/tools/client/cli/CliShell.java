@@ -119,9 +119,7 @@ class CliShell {
             try {
                 line = m_lineReader.readLine(m_1stPrompt);
             } catch(UserInterruptException e) {
-                m_writer.write("User interrupted. ");
-                m_writer.flush();
-                break;
+                continue;
             } catch(EndOfFileException e) {
                 commandQuit();
                 break;
@@ -170,6 +168,9 @@ class CliShell {
                         break;
 
                     case HELP:
+                        commandHelp(command);
+                        break;
+
                     case INVALID_COMMAND:
                         printHelpMessage();
                         break;
@@ -394,6 +395,30 @@ class CliShell {
 
     }
 
+    private void commandHelp(CliCommand command) {
+        String parameters = command.getParameters();
+        if(parameters == null || parameters.isEmpty()) {
+            printHelpMessage();
+            return;
+        }
+
+        parameters = parameters.trim().toUpperCase();
+        for (CliCommandType cmdType : CliCommandType.values()) {
+            String cmdText =  cmdType.getCommandName();
+            if(cmdText.equals(parameters)) {
+                m_writer.println(cmdType.getUsage());
+                m_writer.println();
+                m_writer.flush();
+                return;
+            }
+        }
+
+        m_writer.print("Unknown command: ");
+        m_writer.println(parameters);
+        m_writer.println();
+        m_writer.flush();
+    }
+
 
     private CliCommand parseLine(String line) {
         line = CliUtil.trimCommand(line);
@@ -417,6 +442,7 @@ class CliShell {
     }
 
     private void printHelpMessage() {
+        m_writer.println();
         AttributedStringBuilder builder = new AttributedStringBuilder();
         builder.append("The following commands are supported by ")
                 .append(CliConstants.APP_NAME)
@@ -438,6 +464,7 @@ class CliShell {
         }
 
         m_writer.println(builder.toAnsi());
+        m_writer.println("HELP <COMMAND> to get help for a specific command.\n");
         m_writer.flush();
     }
 
