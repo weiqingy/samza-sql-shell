@@ -23,7 +23,6 @@ import org.apache.samza.config.TaskConfig;
 import org.apache.samza.container.grouper.task.SingleContainerGrouperFactory;
 import org.apache.samza.serializers.StringSerdeFactory;
 import org.apache.samza.sql.avro.AvroRelSchemaProvider;
-import org.apache.samza.sql.avro.ConfigBasedAvroRelSchemaProviderFactory;
 import org.apache.samza.sql.fn.FlattenUdf;
 import org.apache.samza.sql.fn.RegexMatchUdf;
 import org.apache.samza.sql.impl.ConfigBasedIOResolverFactory;
@@ -145,75 +144,6 @@ public class SamzaExecutor implements SqlExecutor {
         String schema = avroSchemaProvider.getSchema(sourceInfo.getSystemStream());
 
         return convertAvroToSamzaSqlSchema(schema);
-    }
-
-    private SamzaSqlSchema convertAvroToSamzaSqlSchema(String schema) {
-        Schema avroSchema = Schema.parse(schema);
-        return getSchema(avroSchema.getFields());
-    }
-
-    private SamzaSqlSchema getSchema(List<Schema.Field> fields) {
-        SamzaSqlSchemaBuilder schemaBuilder = SamzaSqlSchemaBuilder.builder();
-        for (Schema.Field field : fields) {
-            schemaBuilder.addField(field.name(), getFieldType(field.schema()));
-        }
-        return schemaBuilder.toTableSchema();
-    }
-
-    private SamzaSqlFieldType getFieldType(org.apache.avro.Schema schema) {
-
-        switch (schema.getType()) {
-            case ARRAY:
-                return SamzaSqlFieldType.createArrayFieldType(getFieldType(schema.getElementType()));
-            case BOOLEAN:
-                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.BOOLEAN);
-            case DOUBLE:
-                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.DOUBLE);
-            case FLOAT:
-                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.FLOAT);
-            case ENUM:
-                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING);
-            case UNION:
-                // NOTE: We only support Union types when they are used for representing Nullable fields in Avro
-                List<org.apache.avro.Schema> types = schema.getTypes();
-                if (types.size() == 2) {
-                    if (types.get(0).getType() == org.apache.avro.Schema.Type.NULL) {
-                        return getFieldType(types.get(1));
-                    } else if ((types.get(1).getType() == org.apache.avro.Schema.Type.NULL)) {
-                        return getFieldType(types.get(0));
-                    }
-                }
-            case FIXED:
-                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING);
-            case STRING:
-                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING);
-            case BYTES:
-                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.BYTES);
-            case INT:
-                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.INT32);
-            case LONG:
-                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.INT64);
-            case RECORD:
-                return SamzaSqlFieldType.createRowFieldType(getSchema(schema.getFields()));
-            case MAP:
-                return SamzaSqlFieldType.createMapFieldType(getFieldType(schema.getValueType()));
-            default:
-                String msg = String.format("Field Type %s is not supported", schema.getType());
-                LOG.error(msg);
-                throw new SamzaException(msg);
-        }
-    }
-
-    private static <T> T initializePlugin(String pluginName, String plugin, Config staticConfig,
-        String pluginDomainFormat, BiFunction<Object, Config, T> factoryInvoker) {
-        String pluginDomain = String.format(pluginDomainFormat, plugin);
-        Config pluginConfig = staticConfig.subset(pluginDomain);
-        String factoryName = pluginConfig.getOrDefault(CFG_FACTORY, "");
-        Validate.notEmpty(factoryName, String.format("Factory is not set for %s", plugin));
-        Object factory = ReflectionUtils.createInstance(factoryName);
-        Validate.notNull(factory, String.format("Factory creation failed for %s", plugin));
-        LOG.info("Instantiating {} using factory {} with props {}", pluginName, factoryName, pluginConfig);
-        return factoryInvoker.apply(factory, pluginConfig);
     }
 
     @Override
@@ -354,6 +284,75 @@ public class SamzaExecutor implements SqlExecutor {
 
 
     // -- private functions ------------------------------------------
+
+    private SamzaSqlSchema convertAvroToSamzaSqlSchema(String schema) {
+        Schema avroSchema = Schema.parse(schema);
+        return getSchema(avroSchema.getFields());
+    }
+
+    private SamzaSqlSchema getSchema(List<Schema.Field> fields) {
+        SamzaSqlSchemaBuilder schemaBuilder = SamzaSqlSchemaBuilder.builder();
+        for (Schema.Field field : fields) {
+            schemaBuilder.addField(field.name(), getFieldType(field.schema()));
+        }
+        return schemaBuilder.toTableSchema();
+    }
+
+    private SamzaSqlFieldType getFieldType(org.apache.avro.Schema schema) {
+
+        switch (schema.getType()) {
+            case ARRAY:
+                return SamzaSqlFieldType.createArrayFieldType(getFieldType(schema.getElementType()));
+            case BOOLEAN:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.BOOLEAN);
+            case DOUBLE:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.DOUBLE);
+            case FLOAT:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.FLOAT);
+            case ENUM:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING);
+            case UNION:
+                // NOTE: We only support Union types when they are used for representing Nullable fields in Avro
+                List<org.apache.avro.Schema> types = schema.getTypes();
+                if (types.size() == 2) {
+                    if (types.get(0).getType() == org.apache.avro.Schema.Type.NULL) {
+                        return getFieldType(types.get(1));
+                    } else if ((types.get(1).getType() == org.apache.avro.Schema.Type.NULL)) {
+                        return getFieldType(types.get(0));
+                    }
+                }
+            case FIXED:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING);
+            case STRING:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING);
+            case BYTES:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.BYTES);
+            case INT:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.INT32);
+            case LONG:
+                return SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.INT64);
+            case RECORD:
+                return SamzaSqlFieldType.createRowFieldType(getSchema(schema.getFields()));
+            case MAP:
+                return SamzaSqlFieldType.createMapFieldType(getFieldType(schema.getValueType()));
+            default:
+                String msg = String.format("Field Type %s is not supported", schema.getType());
+                LOG.error(msg);
+                throw new SamzaException(msg);
+        }
+    }
+
+    private static <T> T initializePlugin(String pluginName, String plugin, Config staticConfig,
+        String pluginDomainFormat, BiFunction<Object, Config, T> factoryInvoker) {
+        String pluginDomain = String.format(pluginDomainFormat, plugin);
+        Config pluginConfig = staticConfig.subset(pluginDomain);
+        String factoryName = pluginConfig.getOrDefault(CFG_FACTORY, "");
+        Validate.notEmpty(factoryName, String.format("Factory is not set for %s", plugin));
+        Object factory = ReflectionUtils.createInstance(factoryName);
+        Validate.notNull(factory, String.format("Factory creation failed for %s", plugin));
+        LOG.info("Instantiating {} using factory {} with props {}", pluginName, factoryName, pluginConfig);
+        return factoryInvoker.apply(factory, pluginConfig);
+    }
 
     private List<String> formatSqlStmts(List<String> statements) {
         return statements.stream().map(sql -> {

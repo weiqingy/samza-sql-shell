@@ -204,10 +204,10 @@ class CliShell {
     }
 
     private void commandDescribe(CliCommand command) {
-        // TODO: Remove the try catch blcok. Executor is not supposed to report error by exceptions
+        // TODO: Remove the try catch block. Executor is not supposed to report error by exceptions
         String parameters = command.getParameters();
         if(parameters == null || parameters.isEmpty()) {
-            m_writer.println("Usage: DESCRIBE <TableName>\n");
+            m_writer.println(command.getCommandType().getUsage() + "\n");
             return;
         }
 
@@ -215,6 +215,7 @@ class CliShell {
             SamzaSqlSchema tableSchema = m_executor.getTableScema(m_env.generateExecutionContext(), parameters);
             printSchema(tableSchema);
         } catch(Exception e) {
+            m_writer.println(command.getCommandType().getUsage() + "\n");
             m_writer.println("Execution error: " + e.getMessage());
             m_writer.println("Exception: " + e.getClass().getName());
         }
