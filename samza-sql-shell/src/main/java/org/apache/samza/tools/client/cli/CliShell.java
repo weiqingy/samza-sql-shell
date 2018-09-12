@@ -216,7 +216,6 @@ class CliShell {
             SamzaSqlSchema tableSchema = m_executor.getTableScema(m_env.generateExecutionContext(), parameters);
             printSchema(tableSchema);
         } catch(Exception e) {
-            m_writer.println(command.getCommandType().getUsage() + "\n");
             m_writer.println("Execution error: " + e.getMessage());
             m_writer.println("Exception: " + e.getClass().getName());
         }
@@ -298,6 +297,7 @@ class CliShell {
                 m_writer.print("\t");
                 m_writer.println(statement);
             }
+            m_writer.println();
         }
         m_writer.println("Statements NOT submitted: \n");
         if (nonsubmittedStmts == null || nonsubmittedStmts.size() == 0) {
@@ -310,6 +310,7 @@ class CliShell {
         }
         m_writer.println();
         m_writer.println("Note: All query statements in a sql file are NOT submitted.");
+        m_writer.println();
         m_writer.flush();
     }
 

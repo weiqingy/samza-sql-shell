@@ -1,6 +1,9 @@
 package org.apache.samza.tools.client.impl;
 
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -51,6 +54,7 @@ import org.apache.samza.tools.client.util.RandomAccessQueue;
 import org.apache.samza.tools.json.JsonRelConverterFactory;
 import org.apache.samza.tools.schemas.ProfileChangeEvent;
 import org.apache.samza.tools.client.udfs.GetSqlFieldUdf;
+import org.jline.utils.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Joiner;
@@ -189,9 +193,20 @@ public class SamzaExecutor implements SqlExecutor {
     }
 
     @Override
-    public NonQueryResult executeNonQuery(ExecutionContext context,  URI sqlFile) {
+    public NonQueryResult executeNonQuery(ExecutionContext context, URI sqlFile) {
         m_lastestErrorMsg = "";
-        List<String> executedStmts = SqlFileParser.parseSqlFile(sqlFile.getPath());
+
+        Log.info("Sql file path: " + sqlFile.getPath());
+        List<String> executedStmts = new ArrayList<>();
+        try {
+            executedStmts = Files.lines(Paths.get(sqlFile.getPath())).collect(Collectors.toList());
+        } catch (IOException e) {
+            String msg = String.format("Unable to parse the sql file %s", sqlFile.getPath());
+            LOG.error(msg, e);
+            throw new SamzaException(msg, e);
+        }
+        Log.info("Sql statements in Sql file: " + executedStmts.toString());
+
         List<String> submittedStmts = new ArrayList<>();
         List<String> nonSubmittedStmts = new ArrayList<>();
         validateExecutedStmts(executedStmts, submittedStmts, nonSubmittedStmts);
@@ -374,8 +389,11 @@ public class SamzaExecutor implements SqlExecutor {
     }
 
     private void validateExecutedStmts(List<String> statements, List<String> submittedStmts,
-        List<String> nonSubmittedStmts) {
+        List<String> nonSubmittedStmts) { ;
         for (String sql: statements) {
+            if (sql.isEmpty()) {
+                continue;
+            }
             if (!sql.toLowerCase().startsWith("insert")) {
                 nonSubmittedStmts.add(sql);
             } else {
