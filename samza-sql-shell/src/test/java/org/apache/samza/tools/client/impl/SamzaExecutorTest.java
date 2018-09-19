@@ -22,17 +22,17 @@ public class SamzaExecutorTest {
         QueryResult queryResult = m_executor.executeQuery(null, sql);
         SqlSchema ts = queryResult.getTableSchema();
 
-        Assert.assertEquals("__key__", ts.getColumnName(0));
-        Assert.assertEquals("Name", ts.getColumnName(1));
-        Assert.assertEquals("NewCompany", ts.getColumnName(2));
-        Assert.assertEquals("OldCompany", ts.getColumnName(3));
-        Assert.assertEquals("ProfileChangeTimestamp", ts.getColumnName(4));
+        Assert.assertEquals("__key__", ts.getFieldName(0));
+        Assert.assertEquals("Name", ts.getFieldName(1));
+        Assert.assertEquals("NewCompany", ts.getFieldName(2));
+        Assert.assertEquals("OldCompany", ts.getFieldName(3));
+        Assert.assertEquals("ProfileChangeTimestamp", ts.getFieldName(4));
 
-        /*Assert.assertEquals("VARCHAR", ts.getColumTypeName(0));
-        Assert.assertEquals("VARCHAR", ts.getColumTypeName(1));
-        Assert.assertEquals("VARCHAR", ts.getColumTypeName(2));
-        Assert.assertEquals("VARCHAR", ts.getColumTypeName(3));
-        Assert.assertEquals("BIGINT", ts.getColumTypeName(4));*/
+        /*Assert.assertEquals("VARCHAR", ts.getFieldTypeName(0));
+        Assert.assertEquals("VARCHAR", ts.getFieldTypeName(1));
+        Assert.assertEquals("VARCHAR", ts.getFieldTypeName(2));
+        Assert.assertEquals("VARCHAR", ts.getFieldTypeName(3));
+        Assert.assertEquals("BIGINT", ts.getFieldTypeName(4));*/
 
         try {
           Thread.sleep(5000); // wait for seconds

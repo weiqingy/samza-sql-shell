@@ -3,7 +3,7 @@ package org.apache.samza.tools.client.interfaces;
 
 import java.net.URI;
 import java.util.List;
-import org.apache.samza.tools.client.cli.UdfDisplayInfo;
+import org.apache.samza.tools.client.impl.UdfDisplayInfo;
 
 
 /**
@@ -120,5 +120,5 @@ public interface SqlExecutor {
      * @param m_exeContext
      * @return
      */
-    List<UdfDisplayInfo> listFunctions(ExecutionContext m_exeContext);
+    List<SqlFunction> listFunctions(ExecutionContext m_exeContext);
 }

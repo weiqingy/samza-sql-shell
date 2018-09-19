@@ -1,13 +1,11 @@
 package org.apache.samza.tools.client.cli;
 
-import com.google.common.base.Joiner;
-
 import java.io.*;
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
+
 import org.apache.samza.SamzaException;
 import org.apache.samza.tools.client.impl.SamzaExecutor;
+import org.apache.samza.tools.client.impl.UdfDisplayInfo;
 import org.apache.samza.tools.client.interfaces.*;
 import org.apache.samza.tools.client.util.CliException;
 import org.apache.samza.tools.client.util.CliUtil;
@@ -20,7 +18,6 @@ import org.jline.reader.impl.DefaultParser;
 import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
 import org.jline.utils.InfoCmp;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -395,10 +392,10 @@ class CliShell {
     }
 
     private void commandShowFunctions(CliCommand command) {
-        List<UdfDisplayInfo> fns = m_executor.listFunctions(m_env.generateExecutionContext());
+        List<SqlFunction> fns = m_executor.listFunctions(m_env.generateExecutionContext());
 
         if(fns != null) {
-            for(UdfDisplayInfo fn : fns) {
+            for(SqlFunction fn : fns) {
                 m_writer.write(fn.toString());
                 m_writer.write('\n');
             }
@@ -498,19 +495,19 @@ class CliShell {
         -------------------------
     */
 //    private List<String> formatSchema4Display(SqlSchema tableSchema) {
-//        List<String> display = new ArrayList<>(tableSchema.getColumnCount() * 2);
+//        List<String> display = new ArrayList<>(tableSchema.getFieldCount() * 2);
 //        int seperatorPos = 10;
 //        int terminalWidth = m_terminal.getWidth();
 //        int maxLineLength = 0;
-//        int count = tableSchema.getColumnCount();
+//        int count = tableSchema.getFieldCount();
 //
 //        for (int i = 0; i < count; ++i) {
-//            String fieldName = tableSchema.getColumnName(i);
+//            String fieldName = tableSchema.getFieldName(i);
 //            seperatorPos = Math.max(fieldName.length() + 2, seperatorPos); // two spaces
 //        }
 //        seperatorPos = Math.min(seperatorPos, terminalWidth / 2);
 //        for (int i = 0; i < count; ++i) {
-//            SamzaSqlFieldType fieldType = tableSchema.getColumTypeName(i);
+//            SamzaSqlFieldType fieldType = tableSchema.getFieldTypeName(i);
 //            String typeName = getColumnTypeName(fieldType);
 //            maxLineLength = Math.max(typeName.length() + seperatorPos, seperatorPos);
 //        }
@@ -527,14 +524,14 @@ class CliShell {
         int seperatorPos = 10;
         int terminalWidth = m_terminal.getWidth();
         int maxLineLength = terminalWidth;
-        int count = tableSchema.getColumnCount();
+        int count = tableSchema.getFieldCount();
         for (int i = 0; i < count; ++i) {
-            String fieldName = tableSchema.getColumnName(i);
+            String fieldName = tableSchema.getFieldName(i);
             seperatorPos = Math.max(fieldName.length() + 1, seperatorPos);
         }
         seperatorPos = Math.min(seperatorPos, terminalWidth / 2);
         for (int i = 0; i < count; ++i) {
-            String typeName = tableSchema.getColumTypeName(i);
+            String typeName = tableSchema.getFieldTypeName(i);
             maxLineLength = Math.max(typeName.length() + seperatorPos, seperatorPos);
         }
 
@@ -542,12 +539,12 @@ class CliShell {
         maxLineLength = Math.min(maxLineLength, terminalWidth);
         for (int i = -1; i < count; ++i) {
             m_writer.write(' ');
-            String fieldName = i == -1 ? "Field" : tableSchema.getColumnName(i);
+            String fieldName = i == -1 ? "Field" : tableSchema.getFieldName(i);
             for(int j = 0; j < seperatorPos - 1; ++j) {
                 m_writer.write(j < fieldName.length() ? fieldName.charAt(j) : ' ' );
             }
             m_writer.write(" | ");
-            m_writer.println(i == -1 ? "Type" : tableSchema.getColumTypeName(i));
+            m_writer.println(i == -1 ? "Type" : tableSchema.getFieldTypeName(i));
 
             if(i == -1 || i == count - 1) {
                 for(int j = 0; j < maxLineLength; ++j) {

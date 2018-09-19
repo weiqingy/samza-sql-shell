@@ -4,8 +4,8 @@ package org.apache.samza.tools.client.interfaces;
 import java.util.List;
 
 public class SqlSchema {
-    private String[] m_names; // column names
-    private String[] m_typeNames; // names of column type
+    private String[] m_names; // field names
+    private String[] m_typeNames; // names of field type
 
     public SqlSchema(List<String> colNames, List<String> colTypeNames) {
         if(colNames == null || colNames.size() == 0
@@ -20,15 +20,15 @@ public class SqlSchema {
         m_typeNames = colTypeNames.toArray(m_typeNames);
     }
 
-    public int getColumnCount() {
+    public int getFieldCount() {
         return m_names.length;
     }
 
-    public String getColumnName(int colIdx) {
+    public String getFieldName(int colIdx) {
         return m_names[colIdx];
     }
 
-    public String getColumTypeName(int colIdx) {
+    public String getFieldTypeName(int colIdx) {
         return m_typeNames[colIdx];
     }
 }

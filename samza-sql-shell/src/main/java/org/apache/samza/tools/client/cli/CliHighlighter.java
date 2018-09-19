@@ -10,18 +10,6 @@ import org.jline.utils.AttributedStyle;
 
 import java.util.List;
 
-// A primitive higlighter. Improve it together with completer.
-// Redo with a different set ot jline API to get more control:
-// Utilizing the parser/completer/highlighter together to avoid duplicate processing
-
-// TODO A:
-//  1. Handle commands containing spaces, like "SHOW TABLE"
-//  2. Handle quotes " '
-//  3. Handle escape sequences, like \' and \"
-//  4. Color constant literals
-//
-// TODO B:
-//  5. Handle table names, etc.
 
 public class CliHighlighter implements Highlighter {
     private static final List<String> keywords;

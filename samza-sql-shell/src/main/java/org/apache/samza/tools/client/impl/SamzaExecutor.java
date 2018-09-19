@@ -47,7 +47,6 @@ import org.apache.samza.system.eventhub.EventHubSystemFactory;
 import org.apache.samza.system.kafka.KafkaSystemFactory;
 import org.apache.samza.tools.avro.AvroSchemaGenRelConverterFactory;
 import org.apache.samza.tools.avro.AvroSerDeFactory;
-import org.apache.samza.tools.client.cli.UdfDisplayInfo;
 import org.apache.samza.tools.client.interfaces.*;
 import org.apache.samza.tools.client.util.RandomAccessQueue;
 import org.apache.samza.tools.json.JsonRelConverterFactory;
@@ -282,8 +281,8 @@ public class SamzaExecutor implements SqlExecutor {
     }
 
     @Override
-    public List<UdfDisplayInfo> listFunctions(ExecutionContext m_exeContext) {
-        List<UdfDisplayInfo> udfs = new ArrayList<>();
+    public List<SqlFunction> listFunctions(ExecutionContext m_exeContext) {
+        List<SqlFunction> udfs = new ArrayList<>();
         udfs.add(new UdfDisplayInfo("RegexMatch", "Matches the string to the regex",
             Arrays.asList(SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING),
                 SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING)),
@@ -314,8 +313,8 @@ public class SamzaExecutor implements SqlExecutor {
             return String.format("ARRAY(%s)", getColumnTypeName(fieldType.getElementType()));
         } else {
             SqlSchema schema = fieldType.getRowSchema();
-            List<String> fieldTypes = IntStream.range(0, schema.getColumnCount())
-                    .mapToObj(i -> schema.getColumnName(i) + " " + schema.getColumTypeName(i))
+            List<String> fieldTypes = IntStream.range(0, schema.getFieldCount())
+                    .mapToObj(i -> schema.getFieldName(i) + " " + schema.getFieldTypeName(i))
                     .collect(Collectors.toList());
             String rowSchemaValue = Joiner.on(", ").join(fieldTypes);
             return String.format("STRUCT(%s)", rowSchemaValue);
