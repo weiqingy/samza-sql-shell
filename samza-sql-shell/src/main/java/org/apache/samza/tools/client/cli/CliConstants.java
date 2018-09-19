@@ -29,6 +29,4 @@ class CliConstants {
     }
 
     public static final char SPACE = '\u0020';
-
-
 }

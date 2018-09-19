@@ -3,15 +3,16 @@ package org.apache.samza.tools.client.cli;
 import com.google.common.base.Joiner;
 
 import java.io.*;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.samza.SamzaException;
-import org.apache.samza.sql.interfaces.UdfMetadata;
 import org.apache.samza.tools.client.impl.SamzaExecutor;
 import org.apache.samza.tools.client.interfaces.*;
 import org.apache.samza.tools.client.util.CliException;
 import org.apache.samza.tools.client.util.CliUtil;
 
+import org.apache.zookeeper.KeeperException;
 import org.jline.reader.*;
 import org.jline.reader.impl.completer.StringsCompleter;
 import org.jline.terminal.Terminal;
@@ -20,13 +21,10 @@ import org.jline.reader.impl.DefaultParser;
 import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
 import org.jline.utils.InfoCmp;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 
 class CliShell {
@@ -56,8 +54,8 @@ class CliShell {
 
         // LineReader
         final DefaultParser parser = new DefaultParser()
-                .eofOnEscapedNewLine(true);
-        //        .eofOnUnclosedQuote(true);
+                .eofOnEscapedNewLine(true)
+                .eofOnUnclosedQuote(true);
         m_lineReader = LineReaderBuilder.builder()
                 .appName(CliConstants.APP_NAME)
                 .terminal(m_terminal)
@@ -91,17 +89,15 @@ class CliShell {
     }
 
     /**
-    *  Actually run the shell. Does not return until commanded.
+    *  Actually run the shell. Does not return until user choose to exit.
     */
     public void open() {
         // Remember we cannot enter alternate screen mode here as there is only one alternate
         // screen and we need it to show streaming results. Clear the screen instead.
-
-        // m_terminal.puts(InfoCmp.Capability.enter_ca_mode); // tput smcup
-        // put the following line at the end of the method if the line above is enabled
-        // m_terminal.puts(InfoCmp.Capability.exit_ca_mode); // tput rmcup
         clearScreen();
-        // We control terminal directly; Forbid any Java System.out.print stuff
+
+        // We control terminal directly; Forbid any Java System.out and System.err stuff so
+        // any underlying output will not mess up the console
         disableJavaSystemOutAndErr();
         m_writer.write(CliConstants.WELCOME_MESSAGE);
 
@@ -125,7 +121,7 @@ class CliShell {
                 break;
             }
 
-            if(!CliUtil.isStringNullOrEmpty(line)) {
+            if(!CliUtil.isNullOrEmpty(line)) {
                 CliCommand command = parseLine(line);
                 if(command == null)
                     continue;
@@ -177,9 +173,9 @@ class CliShell {
                         break;
 
                     default:
-                        m_writer.write("TODO: Execute command:" + command.getCommandType() + "\n");
+                        m_writer.write("UNDER DEVELOPEMENT. Command:" + command.getCommandType() + "\n");
                         m_writer.write("Parameters:" +
-                                (CliUtil.isStringNullOrEmpty(command.getParameters()) ? "NULL" : command.getParameters())
+                                (CliUtil.isNullOrEmpty(command.getParameters()) ? "NULL" : command.getParameters())
                                 + "\n\n");
                         m_writer.flush();
                 }
@@ -205,20 +201,22 @@ class CliShell {
     }
 
     private void commandDescribe(CliCommand command) {
-        // TODO: Remove the try catch block. Executor is not supposed to report error by exceptions
         String parameters = command.getParameters();
-        if(parameters == null || parameters.isEmpty()) {
+        if(CliUtil.isNullOrEmpty(parameters)) {
             m_writer.println(command.getCommandType().getUsage() + "\n");
+            m_writer.flush();
             return;
         }
 
-        try {
-            SamzaSqlSchema tableSchema = m_executor.getTableScema(m_env.generateExecutionContext(), parameters);
-            printSchema(tableSchema);
-        } catch(Exception e) {
-            m_writer.println("Execution error: " + e.getMessage());
-            m_writer.println("Exception: " + e.getClass().getName());
+        SamzaSqlSchema tableSchema = m_executor.getTableScema(m_env.generateExecutionContext(), parameters);
+        if(tableSchema == null) {
+            m_writer.println("Failed to get schema. Error: " + m_executor.getErrorMsg());
+            m_writer.println();
+            m_writer.flush();
+            return;
         }
+
+        printSchema(tableSchema);
         m_writer.flush();
     }
 
@@ -442,7 +440,7 @@ class CliShell {
 
     private CliCommand parseLine(String line) {
         line = CliUtil.trimCommand(line);
-        if(CliUtil.isStringNullOrEmpty(line))
+        if(CliUtil.isNullOrEmpty(line))
             return null;
 
         String upperCaseLine = line.toUpperCase();
@@ -509,24 +507,39 @@ class CliShell {
         }
     }
 
+    /*
+        Field    | Type
+        -------------------------
+        Field1   | Type 1
+        Field2   | VARCHAR(STRING)
+        Field... | VARCHAR(STRING)
+        -------------------------
+    */
+    private List<String> formatSchema4Display(SamzaSqlSchema tableSchema) {
+        List<String> display = new ArrayList<>(tableSchema.getColumnCount() * 2);
+        int seperatorPos = 10;
+        int terminalWidth = m_terminal.getWidth();
+        int maxLineLength = 0;
+        int count = tableSchema.getColumnCount();
 
-    private void printSchema(SamzaSqlSchema tableSchema) {
-        if(tableSchema == null) {
-            m_writer.write("Failed to get table schema. Error: ");
-            m_writer.write(m_executor.getErrorMsg());
-            m_writer.write("\n\n");
-            return;
+        for (int i = 0; i < count; ++i) {
+            String fieldName = tableSchema.getColumnName(i);
+            seperatorPos = Math.max(fieldName.length() + 2, seperatorPos); // two spaces
+        }
+        seperatorPos = Math.min(seperatorPos, terminalWidth / 2);
+        for (int i = 0; i < count; ++i) {
+            SamzaSqlFieldType fieldType = tableSchema.getColumTypeName(i);
+            String typeName = getColumnTypeName(fieldType);
+            maxLineLength = Math.max(typeName.length() + seperatorPos, seperatorPos);
         }
 
-/*
-        Field   | Type
-        -------------------------
-        ROWTIME | BIGINT
-        ROWKEY  | VARCHAR(STRING)
-        IP      | VARCHAR(STRING)
-        KBYTES  | BIGINT
-        -------------------------
-*/
+
+        throw new NotImplementedException();
+ //       return display;
+    }
+
+
+    private void printSchema(SamzaSqlSchema tableSchema) {
         m_writer.println();
 
         int seperatorPos = 10;
@@ -543,6 +556,7 @@ class CliShell {
             String typeName = getColumnTypeName(fieldType);
             maxLineLength = Math.max(typeName.length() + seperatorPos, seperatorPos);
         }
+
         maxLineLength += 6;
         maxLineLength = Math.min(maxLineLength, terminalWidth);
         for (int i = -1; i < count; ++i) {

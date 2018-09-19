@@ -2,11 +2,23 @@ package org.apache.samza.tools.client.cli;
 
 import org.apache.samza.tools.client.interfaces.ExecutionContext;
 
+import java.io.File;
 import java.io.PrintWriter;
 
 public class CliEnvironment {
+    private String m_defaultPersistenceLocation;
+
     private ExecutionContext.MessageFormat m_messageFormat = ExecutionContext.MessageFormat.COMPACT;
     private static final String m_messageFormatEnvVar = "OUTPUT";
+
+
+    public CliEnvironment() {
+        m_defaultPersistenceLocation = System.getProperty("user.home");
+        if(m_defaultPersistenceLocation == null || m_defaultPersistenceLocation.isEmpty()) {
+            m_defaultPersistenceLocation = System.getProperty("user.dir");
+        }
+    }
+
 
     public ExecutionContext.MessageFormat getMessageFormat() {
         return m_messageFormat;

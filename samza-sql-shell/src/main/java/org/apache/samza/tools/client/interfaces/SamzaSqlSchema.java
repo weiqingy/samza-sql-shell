@@ -4,10 +4,8 @@ package org.apache.samza.tools.client.interfaces;
 import java.util.List;
 
 public class SamzaSqlSchema {
-    private String[] m_names;
-
-    // TODO: we may need concrete type information later
-    private SamzaSqlFieldType[] m_typeNames;
+    private String[] m_names; // column names
+    private SamzaSqlFieldType[] m_typeNames; // names of column type
 
     public SamzaSqlSchema(List<String> colNames, List<SamzaSqlFieldType> colTypeNames) {
         if(colNames == null || colNames.size() == 0
@@ -16,10 +14,10 @@ public class SamzaSqlSchema {
             throw new IllegalArgumentException();
 
         m_names = new String[colNames.size()];
-        colNames.toArray(m_names);
+        m_names = colNames.toArray(m_names);
 
         m_typeNames = new SamzaSqlFieldType[colTypeNames.size()];
-        colTypeNames.toArray(m_typeNames);
+        m_typeNames = colTypeNames.toArray(m_typeNames);
     }
 
     public int getColumnCount() {

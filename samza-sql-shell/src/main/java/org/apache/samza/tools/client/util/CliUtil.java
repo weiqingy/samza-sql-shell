@@ -12,13 +12,13 @@ import org.slf4j.LoggerFactory;
 public class CliUtil {
     private static final Logger LOG = LoggerFactory.getLogger(CliUtil.class);
 
-    public static boolean isStringNullOrEmpty(String str) {
+    public static boolean isNullOrEmpty(String str) {
         return str == null || str.isEmpty();
     }
 
     // Trims: leading spaces; trailing spaces and ";"s
     public static String trimCommand(String command) {
-        if(isStringNullOrEmpty(command))
+        if(isNullOrEmpty(command))
             return command;
 
         int len = command.length();
@@ -36,7 +36,7 @@ public class CliUtil {
 
     public static List<String> splitWithSpace(String buffer) {
         List<String> list = new ArrayList<String>();
-        if(isStringNullOrEmpty(buffer))
+        if(isNullOrEmpty(buffer))
             return list;
 
         boolean prevIsSpace = Character.isSpaceChar(buffer.charAt(0));
