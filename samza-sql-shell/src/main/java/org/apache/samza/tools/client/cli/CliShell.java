@@ -204,18 +204,13 @@ class CliShell {
             return;
         }
 
-//        SqlSchema tableSchema = m_executor.getTableScema(m_env.generateExecutionContext(), parameters);
-//        SqlSchema tableSchema = new SqlSchema();
-
-        SqlSchema tableSchema = SqlSchemaBuilder.builder().addField("ABC", "ABC")
-        .addField("ABCDEFGHIJBBCDEFGHIJ", "ABCDEFGHIJBBCDEFGHIJCBCDEFGHIJDBCDEFGHIJABCDEFGHIJBBCDEFGHIJCBCDEFGHIJDBCDEFGHIJABCDEFGHIJBBCDEFGHIJCBCDEFGHIJDBCDEFGHIJABCDEFGHIJBBCDEFGHIJCBCDEFGHIJDBCDEFGHIJABCDEFGHIJBBCDEFGHIJCBCDEFGHIJDBCDEFGHIJ")
-        .addField("ABCDEFGHIJ", "ABC").toTableSchema();
-
+        SqlSchema tableSchema = m_executor.getTableScema(m_env.generateExecutionContext(), parameters);
 
         if(tableSchema == null) {
             m_writer.println("Failed to get schema. Error: " + m_executor.getErrorMsg());
         }
         else {
+            m_writer.println();
             List<String> lines = formatSchema4Display(tableSchema);
             for(String line : lines) {
                 m_writer.println(line);
