@@ -3,7 +3,7 @@ package org.apache.samza.tools.client.impl;
 
 import java.util.List;
 import org.apache.samza.tools.client.interfaces.QueryResult;
-import org.apache.samza.tools.client.interfaces.SamzaSqlSchema;
+import org.apache.samza.tools.client.interfaces.SqlSchema;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -20,7 +20,7 @@ public class SamzaExecutorTest {
     public void testQueryResult() {
         String sql = "select * from kafka.ProfileChangeStream";
         QueryResult queryResult = m_executor.executeQuery(null, sql);
-        SamzaSqlSchema ts = queryResult.getTableSchema();
+        SqlSchema ts = queryResult.getTableSchema();
 
         Assert.assertEquals("__key__", ts.getColumnName(0));
         Assert.assertEquals("Name", ts.getColumnName(1));

@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import kafka.utils.ZkUtils;
 import org.I0Itec.zkclient.ZkClient;
@@ -40,7 +41,6 @@ import org.apache.samza.sql.runner.SamzaSqlApplicationConfig;
 import org.apache.samza.sql.runner.SamzaSqlApplicationRunner;
 import org.apache.samza.sql.testutil.JsonUtil;
 import org.apache.samza.sql.testutil.ReflectionUtils;
-import org.apache.samza.sql.testutil.SqlFileParser;
 import org.apache.samza.standalone.PassthroughJobCoordinatorFactory;
 import org.apache.samza.system.OutgoingMessageEnvelope;
 import org.apache.samza.system.eventhub.EventHubSystemFactory;
@@ -49,11 +49,9 @@ import org.apache.samza.tools.avro.AvroSchemaGenRelConverterFactory;
 import org.apache.samza.tools.avro.AvroSerDeFactory;
 import org.apache.samza.tools.client.cli.UdfDisplayInfo;
 import org.apache.samza.tools.client.interfaces.*;
-import org.apache.samza.tools.client.schema.FileSystemAvroRelSchemaProviderFactory;
 import org.apache.samza.tools.client.util.RandomAccessQueue;
 import org.apache.samza.tools.json.JsonRelConverterFactory;
 import org.apache.samza.tools.schemas.ProfileChangeEvent;
-import org.apache.samza.tools.client.udfs.GetSqlFieldUdf;
 import org.jline.utils.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,7 +132,7 @@ public class SamzaExecutor implements SqlExecutor {
     }
 
     @Override
-    public SamzaSqlSchema getTableScema(ExecutionContext context, String tableName) {
+    public SqlSchema getTableScema(ExecutionContext context, String tableName) {
         int execId = m_execIdSeq.incrementAndGet();
         Map<String, String> staticConfigs = fetchSamzaSqlConfig(execId);
         Config samzaSqlConfig = new MapConfig(staticConfigs);
@@ -307,15 +305,32 @@ public class SamzaExecutor implements SqlExecutor {
 
     // -- private functions ------------------------------------------
 
-    private SamzaSqlSchema convertAvroToSamzaSqlSchema(String schema) {
+    private String getColumnTypeName(SamzaSqlFieldType fieldType) {
+        if (fieldType.isPrimitiveField()) {
+            return fieldType.getTypeName().toString();
+        } else if (fieldType.getTypeName() == SamzaSqlFieldType.TypeName.MAP) {
+            return String.format("MAP(%s)", getColumnTypeName(fieldType.getValueType()));
+        } else if (fieldType.getTypeName() == SamzaSqlFieldType.TypeName.ARRAY) {
+            return String.format("ARRAY(%s)", getColumnTypeName(fieldType.getElementType()));
+        } else {
+            SqlSchema schema = fieldType.getRowSchema();
+            List<String> fieldTypes = IntStream.range(0, schema.getColumnCount())
+                    .mapToObj(i -> schema.getColumnName(i) + " " + schema.getColumTypeName(i))
+                    .collect(Collectors.toList());
+            String rowSchemaValue = Joiner.on(", ").join(fieldTypes);
+            return String.format("STRUCT(%s)", rowSchemaValue);
+        }
+    }
+
+    private SqlSchema convertAvroToSamzaSqlSchema(String schema) {
         Schema avroSchema = Schema.parse(schema);
         return getSchema(avroSchema.getFields());
     }
 
-    private SamzaSqlSchema getSchema(List<Schema.Field> fields) {
-        SamzaSqlSchemaBuilder schemaBuilder = SamzaSqlSchemaBuilder.builder();
+    private SqlSchema getSchema(List<Schema.Field> fields) {
+        SqlSchemaBuilder schemaBuilder = SqlSchemaBuilder.builder();
         for (Schema.Field field : fields) {
-            schemaBuilder.addField(field.name(), getFieldType(field.schema()));
+            schemaBuilder.addField(field.name(), getColumnTypeName(getFieldType(field.schema())));
         }
         return schemaBuilder.toTableSchema();
     }
@@ -402,7 +417,7 @@ public class SamzaExecutor implements SqlExecutor {
         }
     }
 
-    private SamzaSqlSchema generateResultSchema(Config config) {
+    private SqlSchema generateResultSchema(Config config) {
         SamzaSqlApplicationConfig sqlConfig = new SamzaSqlApplicationConfig(config);
         QueryPlanner planner = new QueryPlanner(
             sqlConfig.getRelSchemaProviders(),
@@ -411,13 +426,13 @@ public class SamzaExecutor implements SqlExecutor {
         RelRoot relRoot = planner.plan(sqlConfig.getQueryInfo().get(0).getSelectQuery());
 
         List<String> colNames = new ArrayList<>();
-        List<SamzaSqlFieldType> colTypeNames = new ArrayList<>();
+        List<String> colTypeNames = new ArrayList<>();
         for (RelDataTypeField dataTypeField : relRoot.validatedRowType.getFieldList()) {
             colNames.add(dataTypeField.getName());
             // TODO: colTypeNames.add(dataTypeField.getType().toString());
             colTypeNames.add(null);
         }
-        return new SamzaSqlSchema(colNames, colTypeNames);
+        return new SqlSchema(colNames, colTypeNames);
     }
 
     private String[] getFormattedRow(ExecutionContext context, OutgoingMessageEnvelope row) {

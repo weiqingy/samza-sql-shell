@@ -3,9 +3,9 @@ package org.apache.samza.tools.client.interfaces;
 
 public class QueryResult {
     private int m_execId;
-    private SamzaSqlSchema m_schema;
+    private SqlSchema m_schema;
 
-    public QueryResult(int execId, SamzaSqlSchema schema) {
+    public QueryResult(int execId, SqlSchema schema) {
         if(schema == null)
             throw new IllegalArgumentException();
         m_execId = execId;
@@ -16,7 +16,7 @@ public class QueryResult {
         return m_execId;
     }
 
-    public SamzaSqlSchema getTableSchema() {
+    public SqlSchema getTableSchema() {
         return m_schema;
     }
 }

@@ -28,7 +28,7 @@ import static org.jline.keymap.KeyMap.key;
  */
 
 
-public class QueryResultExpendedLogView implements CliView {
+public class QueryResultLogView implements CliView {
     private static final int DEFAULT_REFRESH_INTERVAL = 100; // all intervals are in ms
 
     private int m_refreshInterval = DEFAULT_REFRESH_INTERVAL;
@@ -47,7 +47,7 @@ public class QueryResultExpendedLogView implements CliView {
     private Thread m_inputThread;
     private BindingReader m_keyReader;
 
-    public QueryResultExpendedLogView() {
+    public QueryResultLogView() {
 
     }
 

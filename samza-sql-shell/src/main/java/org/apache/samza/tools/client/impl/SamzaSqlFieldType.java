@@ -1,4 +1,6 @@
-package org.apache.samza.tools.client.interfaces;
+package org.apache.samza.tools.client.impl;
+
+import org.apache.samza.tools.client.interfaces.SqlSchema;
 
 public class SamzaSqlFieldType {
 
@@ -36,11 +38,11 @@ public class SamzaSqlFieldType {
     return new SamzaSqlFieldType(TypeName.MAP, null, valueType, null);
   }
 
-  public static SamzaSqlFieldType createRowFieldType(SamzaSqlSchema rowSchema) {
+  public static SamzaSqlFieldType createRowFieldType(SqlSchema rowSchema) {
     return new SamzaSqlFieldType(TypeName.ROW, null, null, rowSchema);
   }
 
-  private SamzaSqlFieldType(TypeName typeName, SamzaSqlFieldType elementType, SamzaSqlFieldType valueType, SamzaSqlSchema rowSchema) {
+  private SamzaSqlFieldType(TypeName typeName, SamzaSqlFieldType elementType, SamzaSqlFieldType valueType, SqlSchema rowSchema) {
     this.typeName = typeName;
     this.elementType = elementType;
     this.valueType = valueType;
@@ -53,7 +55,7 @@ public class SamzaSqlFieldType {
 
   private SamzaSqlFieldType valueType;
 
-  private SamzaSqlSchema rowSchema;
+  private SqlSchema rowSchema;
 
   public TypeName getTypeName() {
     return typeName;
@@ -67,7 +69,7 @@ public class SamzaSqlFieldType {
     return valueType;
   }
 
-  public SamzaSqlSchema getRowSchema() {
+  public SqlSchema getRowSchema() {
     return rowSchema;
   }
 }

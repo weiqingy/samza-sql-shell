@@ -1,4 +1,4 @@
-package org.apache.samza.tools.client.schema;
+package org.apache.samza.tools.client.impl;
 
 import java.io.File;
 import java.io.IOException;

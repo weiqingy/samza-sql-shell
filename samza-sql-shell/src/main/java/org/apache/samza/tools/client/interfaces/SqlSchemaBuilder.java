@@ -3,39 +3,39 @@ package org.apache.samza.tools.client.interfaces;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SamzaSqlSchemaBuilder {
+public class SqlSchemaBuilder {
     private List<String> m_names = new ArrayList<>();
-    private List<SamzaSqlFieldType> m_fieldTypes = new ArrayList<>();
+    private List<String> m_typeName = new ArrayList<>();
 
-    private SamzaSqlSchemaBuilder() {
+    private SqlSchemaBuilder() {
     }
 
-    public static SamzaSqlSchemaBuilder builder() {
-        return new SamzaSqlSchemaBuilder();
+    public static SqlSchemaBuilder builder() {
+        return new SqlSchemaBuilder();
     }
 
-    public SamzaSqlSchemaBuilder addField(String name, SamzaSqlFieldType fieldType) {
+    public SqlSchemaBuilder addField(String name, String fieldType) {
         if(name == null || name.isEmpty() || fieldType == null)
             throw new IllegalArgumentException();
 
         m_names.add(name);
-        m_fieldTypes.add(fieldType);
+        m_typeName.add(fieldType);
         return this;
     }
 
-    public SamzaSqlSchemaBuilder appendColumns(List<String> names, List<SamzaSqlFieldType> typeNames) {
+    public SqlSchemaBuilder appendFields(List<String> names, List<String> typeNames) {
         if(names == null || names.size() == 0
                 ||typeNames == null || typeNames.size() == 0
                 || names.size() != typeNames.size())
             throw new IllegalArgumentException();
 
         m_names.addAll(names);
-        m_fieldTypes.addAll(typeNames);
+        m_typeName.addAll(typeNames);
 
         return this;
     }
 
-    public SamzaSqlSchema toTableSchema() {
-        return new SamzaSqlSchema(m_names, m_fieldTypes);
+    public SqlSchema toTableSchema() {
+        return new SqlSchema(m_names, m_typeName);
     }
 }

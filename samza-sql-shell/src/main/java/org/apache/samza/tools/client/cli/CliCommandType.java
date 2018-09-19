@@ -3,12 +3,6 @@ package org.apache.samza.tools.client.cli;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * meta commands start with "." ????
- * extention commands statrt with "!"
- *
- */
-
 enum CliCommandType {
     CLEAR           ("CLEAR", "\tClears the screen.", "CLEAR"),
     DESCRIBE        ("DESCRIBE", "Describes a table.", "Usage: DESCRIBE <table name>"),
@@ -46,7 +40,6 @@ enum CliCommandType {
     public String getUsage() {
         return m_usage;
     }
-
 
     public static List<String> getAllCommands() {
         List<String> cmds = new ArrayList<String>();

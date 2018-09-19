@@ -12,7 +12,6 @@ import org.apache.samza.tools.client.interfaces.*;
 import org.apache.samza.tools.client.util.CliException;
 import org.apache.samza.tools.client.util.CliUtil;
 
-import org.apache.zookeeper.KeeperException;
 import org.jline.reader.*;
 import org.jline.reader.impl.completer.StringsCompleter;
 import org.jline.terminal.Terminal;
@@ -98,7 +97,7 @@ class CliShell {
 
         // We control terminal directly; Forbid any Java System.out and System.err stuff so
         // any underlying output will not mess up the console
-        disableJavaSystemOutAndErr();
+//        disableJavaSystemOutAndErr();
         m_writer.write(CliConstants.WELCOME_MESSAGE);
 
         // Check if jna.jar exists in class path
@@ -208,7 +207,7 @@ class CliShell {
             return;
         }
 
-        SamzaSqlSchema tableSchema = m_executor.getTableScema(m_env.generateExecutionContext(), parameters);
+        SqlSchema tableSchema = m_executor.getTableScema(m_env.generateExecutionContext(), parameters);
         if(tableSchema == null) {
             m_writer.println("Failed to get schema. Error: " + m_executor.getErrorMsg());
             m_writer.println();
@@ -367,7 +366,7 @@ class CliShell {
             QueryResult queryResult = m_executor.executeQuery(exeContext, command.getFullCommand());
             m_executions.put(queryResult.getExecutionId(), fullCmd);
 
-            CliView view = new QueryResultExpendedLogView();
+            CliView view = new QueryResultLogView();
             view.open(this, queryResult);
             m_executor.stopExecution(exeContext, queryResult.getExecutionId());
         } catch (SamzaException e) {
@@ -490,23 +489,6 @@ class CliShell {
         m_terminal.puts(InfoCmp.Capability.clear_screen);
     }
 
-    private String getColumnTypeName(SamzaSqlFieldType fieldType) {
-        if (fieldType.isPrimitiveField()) {
-            return fieldType.getTypeName().toString();
-        } else if (fieldType.getTypeName() == SamzaSqlFieldType.TypeName.MAP) {
-            return String.format("MAP(%s)", getColumnTypeName(fieldType.getValueType()));
-        } else if (fieldType.getTypeName() == SamzaSqlFieldType.TypeName.ARRAY) {
-            return String.format("ARRAY(%s)", getColumnTypeName(fieldType.getElementType()));
-        } else {
-            SamzaSqlSchema schema = fieldType.getRowSchema();
-            List<String> fieldTypes = IntStream.range(0, schema.getColumnCount())
-                .mapToObj(i -> schema.getColumnName(i) + " " + getColumnTypeName(schema.getColumTypeName(i)))
-                .collect(Collectors.toList());
-            String rowSchemaValue = Joiner.on(", ").join(fieldTypes);
-            return String.format("STRUCT(%s)", rowSchemaValue);
-        }
-    }
-
     /*
         Field    | Type
         -------------------------
@@ -515,31 +497,31 @@ class CliShell {
         Field... | VARCHAR(STRING)
         -------------------------
     */
-    private List<String> formatSchema4Display(SamzaSqlSchema tableSchema) {
-        List<String> display = new ArrayList<>(tableSchema.getColumnCount() * 2);
-        int seperatorPos = 10;
-        int terminalWidth = m_terminal.getWidth();
-        int maxLineLength = 0;
-        int count = tableSchema.getColumnCount();
+//    private List<String> formatSchema4Display(SqlSchema tableSchema) {
+//        List<String> display = new ArrayList<>(tableSchema.getColumnCount() * 2);
+//        int seperatorPos = 10;
+//        int terminalWidth = m_terminal.getWidth();
+//        int maxLineLength = 0;
+//        int count = tableSchema.getColumnCount();
+//
+//        for (int i = 0; i < count; ++i) {
+//            String fieldName = tableSchema.getColumnName(i);
+//            seperatorPos = Math.max(fieldName.length() + 2, seperatorPos); // two spaces
+//        }
+//        seperatorPos = Math.min(seperatorPos, terminalWidth / 2);
+//        for (int i = 0; i < count; ++i) {
+//            SamzaSqlFieldType fieldType = tableSchema.getColumTypeName(i);
+//            String typeName = getColumnTypeName(fieldType);
+//            maxLineLength = Math.max(typeName.length() + seperatorPos, seperatorPos);
+//        }
+//
+//
+//        throw new NotImplementedException();
+// //       return display;
+//    }
 
-        for (int i = 0; i < count; ++i) {
-            String fieldName = tableSchema.getColumnName(i);
-            seperatorPos = Math.max(fieldName.length() + 2, seperatorPos); // two spaces
-        }
-        seperatorPos = Math.min(seperatorPos, terminalWidth / 2);
-        for (int i = 0; i < count; ++i) {
-            SamzaSqlFieldType fieldType = tableSchema.getColumTypeName(i);
-            String typeName = getColumnTypeName(fieldType);
-            maxLineLength = Math.max(typeName.length() + seperatorPos, seperatorPos);
-        }
 
-
-        throw new NotImplementedException();
- //       return display;
-    }
-
-
-    private void printSchema(SamzaSqlSchema tableSchema) {
+    private void printSchema(SqlSchema tableSchema) {
         m_writer.println();
 
         int seperatorPos = 10;
@@ -552,8 +534,7 @@ class CliShell {
         }
         seperatorPos = Math.min(seperatorPos, terminalWidth / 2);
         for (int i = 0; i < count; ++i) {
-            SamzaSqlFieldType fieldType = tableSchema.getColumTypeName(i);
-            String typeName = getColumnTypeName(fieldType);
+            String typeName = tableSchema.getColumTypeName(i);
             maxLineLength = Math.max(typeName.length() + seperatorPos, seperatorPos);
         }
 
@@ -566,7 +547,7 @@ class CliShell {
                 m_writer.write(j < fieldName.length() ? fieldName.charAt(j) : ' ' );
             }
             m_writer.write(" | ");
-            m_writer.println(i == -1 ? "Type" : getColumnTypeName(tableSchema.getColumTypeName(i)));
+            m_writer.println(i == -1 ? "Type" : tableSchema.getColumTypeName(i));
 
             if(i == -1 || i == count - 1) {
                 for(int j = 0; j < maxLineLength; ++j) {
