@@ -16,6 +16,20 @@ public class CliUtil {
         return str == null || str.isEmpty();
     }
 
+    public static int ceilingDiv(int x, int y) {
+        if(x < 0 || y <= 0)
+            throw new IllegalArgumentException();
+
+        return x / y + (x % y == 0 ? 0 : 1);
+    }
+
+    public static StringBuilder appendTo(StringBuilder builder, int toPos, char c) {
+        for(int i = builder.length(); i <= toPos; ++i) {
+            builder.append(c);
+        }
+        return builder;
+    }
+
     // Trims: leading spaces; trailing spaces and ";"s
     public static String trimCommand(String command) {
         if(isNullOrEmpty(command))

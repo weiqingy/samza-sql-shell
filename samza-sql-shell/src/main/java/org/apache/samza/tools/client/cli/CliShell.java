@@ -94,7 +94,7 @@ class CliShell {
 
         // We control terminal directly; Forbid any Java System.out and System.err stuff so
         // any underlying output will not mess up the console
-//        disableJavaSystemOutAndErr();
+        disableJavaSystemOutAndErr();
         m_writer.write(CliConstants.WELCOME_MESSAGE);
 
         // Check if jna.jar exists in class path
@@ -102,7 +102,6 @@ class CliShell {
             ClassLoader.getSystemClassLoader().loadClass("com.sun.jna.NativeLibrary");
         } catch(ClassNotFoundException e) {
             // Something's wrong. It could be a dumb terminal if neither jna nor jansi lib is there
-            // Going to a log? Not now.
             m_writer.write("Warning: jna.jar does NOT exist. It may lead to a dumb shell or a performance hit.\n");
         }
 
@@ -199,26 +198,36 @@ class CliShell {
     private void commandDescribe(CliCommand command) {
         String parameters = command.getParameters();
         if(CliUtil.isNullOrEmpty(parameters)) {
-            m_writer.println(command.getCommandType().getUsage() + "\n");
-            m_writer.flush();
-            return;
-        }
-
-        SqlSchema tableSchema = m_executor.getTableScema(m_env.generateExecutionContext(), parameters);
-        if(tableSchema == null) {
-            m_writer.println("Failed to get schema. Error: " + m_executor.getErrorMsg());
+            m_writer.println(command.getCommandType().getUsage());
             m_writer.println();
             m_writer.flush();
             return;
         }
 
-        printSchema(tableSchema);
+//        SqlSchema tableSchema = m_executor.getTableScema(m_env.generateExecutionContext(), parameters);
+//        SqlSchema tableSchema = new SqlSchema();
+
+        SqlSchema tableSchema = SqlSchemaBuilder.builder().addField("ABC", "ABC")
+        .addField("ABCDEFGHIJBBCDEFGHIJ", "ABCDEFGHIJBBCDEFGHIJCBCDEFGHIJDBCDEFGHIJABCDEFGHIJBBCDEFGHIJCBCDEFGHIJDBCDEFGHIJABCDEFGHIJBBCDEFGHIJCBCDEFGHIJDBCDEFGHIJABCDEFGHIJBBCDEFGHIJCBCDEFGHIJDBCDEFGHIJABCDEFGHIJBBCDEFGHIJCBCDEFGHIJDBCDEFGHIJ")
+        .addField("ABCDEFGHIJ", "ABC").toTableSchema();
+
+
+        if(tableSchema == null) {
+            m_writer.println("Failed to get schema. Error: " + m_executor.getErrorMsg());
+        }
+        else {
+            List<String> lines = formatSchema4Display(tableSchema);
+            for(String line : lines) {
+                m_writer.println(line);
+            }
+        }
+        m_writer.println();
         m_writer.flush();
     }
 
     private void commandSet(CliCommand command) {
         String param = command.getParameters();
-        if(param == null || param.isEmpty()) {
+        if(CliUtil.isNullOrEmpty(param)) {
             m_env.printAll(m_writer);
             return;
         }
@@ -494,75 +503,117 @@ class CliShell {
         Field... | VARCHAR(STRING)
         -------------------------
     */
-//    private List<String> formatSchema4Display(SqlSchema tableSchema) {
-//        List<String> display = new ArrayList<>(tableSchema.getFieldCount() * 2);
-//        int seperatorPos = 10;
-//        int terminalWidth = m_terminal.getWidth();
-//        int maxLineLength = 0;
-//        int count = tableSchema.getFieldCount();
-//
-//        for (int i = 0; i < count; ++i) {
-//            String fieldName = tableSchema.getFieldName(i);
-//            seperatorPos = Math.max(fieldName.length() + 2, seperatorPos); // two spaces
-//        }
-//        seperatorPos = Math.min(seperatorPos, terminalWidth / 2);
-//        for (int i = 0; i < count; ++i) {
-//            SamzaSqlFieldType fieldType = tableSchema.getFieldTypeName(i);
-//            String typeName = getColumnTypeName(fieldType);
-//            maxLineLength = Math.max(typeName.length() + seperatorPos, seperatorPos);
-//        }
-//
-//
-//        throw new NotImplementedException();
-// //       return display;
-//    }
+    private List<String> formatSchema4Display(SqlSchema tableSchema) {
+        final String HEADER_FIELD = "Field";
+        final String HEADER_TYPE = "Type";
+        final char SEPERATOR = '|';
+        final char LINE_SEP = '-';
 
-
-    private void printSchema(SqlSchema tableSchema) {
-        m_writer.println();
-
-        int seperatorPos = 10;
         int terminalWidth = m_terminal.getWidth();
-        int maxLineLength = terminalWidth;
-        int count = tableSchema.getFieldCount();
-        for (int i = 0; i < count; ++i) {
-            String fieldName = tableSchema.getFieldName(i);
-            seperatorPos = Math.max(fieldName.length() + 1, seperatorPos);
-        }
-        seperatorPos = Math.min(seperatorPos, terminalWidth / 2);
-        for (int i = 0; i < count; ++i) {
-            String typeName = tableSchema.getFieldTypeName(i);
-            maxLineLength = Math.max(typeName.length() + seperatorPos, seperatorPos);
+        // Two spaces * 2 plus one SEPERATOR
+        if(terminalWidth < 2 + 2 + 1 + HEADER_FIELD.length() + HEADER_TYPE.length()) {
+            return Collections.singletonList("Not enough room.");
         }
 
-        maxLineLength += 6;
-        maxLineLength = Math.min(maxLineLength, terminalWidth);
-        for (int i = -1; i < count; ++i) {
-            m_writer.write(' ');
-            String fieldName = i == -1 ? "Field" : tableSchema.getFieldName(i);
-            for(int j = 0; j < seperatorPos - 1; ++j) {
-                m_writer.write(j < fieldName.length() ? fieldName.charAt(j) : ' ' );
-            }
-            m_writer.write(" | ");
-            m_writer.println(i == -1 ? "Type" : tableSchema.getFieldTypeName(i));
+        // Find the best seperator position for least rows
+        int seperatorPos = HEADER_FIELD.length() + 2;
+        int minRowNeeded = Integer.MAX_VALUE;
+        int longestLineCharNum = 0;
+        int rowCount = tableSchema.getFieldCount();
+        for(int j = seperatorPos; j < terminalWidth - HEADER_TYPE.length() - 2; ++j) {
+            boolean fieldWrapped = false;
+            int rowNeeded = 0;
+            for (int i = 0; i < rowCount; ++i) {
+                int fieldLen = tableSchema.getFieldName(i).length();
+                int typeLen = tableSchema.getFieldTypeName(i).length();
+                int fieldRowNeeded = CliUtil.ceilingDiv(fieldLen, j - 2);
+                int typeRowNeeded = CliUtil.ceilingDiv(typeLen, terminalWidth - 1 - j - 2);
 
-            if(i == -1 || i == count - 1) {
-                for(int j = 0; j < maxLineLength; ++j) {
-                    m_writer.write('-');
+                rowNeeded += Math.max(fieldRowNeeded, typeRowNeeded);
+                fieldWrapped |= fieldRowNeeded > 1;
+                if(typeRowNeeded > 1) {
+                    longestLineCharNum = terminalWidth;
                 }
-                m_writer.println();
+                else {
+                    longestLineCharNum = Math.max(longestLineCharNum, j + typeLen + 2 + 1);
+                }
             }
-
+            if(rowNeeded < minRowNeeded) {
+                minRowNeeded = rowNeeded;
+                seperatorPos = j;
+            }
+            if(!fieldWrapped)
+                break;
         }
-        m_writer.flush();
+
+        List<String> lines = new ArrayList<>(minRowNeeded + 4);
+
+        // Header
+        StringBuilder line = new StringBuilder(terminalWidth);
+        line.append(CliConstants.SPACE);
+        line.append(HEADER_FIELD);
+        CliUtil.appendTo(line, seperatorPos - 1, CliConstants.SPACE);
+        line.append(SEPERATOR);
+        line.append(CliConstants.SPACE);
+        line.append(HEADER_TYPE);
+        lines.add(line.toString());
+        line = new StringBuilder(terminalWidth);
+        CliUtil.appendTo(line, longestLineCharNum - 1, LINE_SEP);
+        lines.add(line.toString());
+
+        // Body
+        AttributedStyle oddLineStyle = AttributedStyle.DEFAULT.BOLD.foreground(AttributedStyle.BLUE);
+        AttributedStyle evenLineStyle = AttributedStyle.DEFAULT.BOLD.foreground(AttributedStyle.CYAN);
+
+        final int fieldColSize = seperatorPos - 2;
+        final int typeColSize = terminalWidth - seperatorPos - 1 - 2;
+        for (int i = 0; i < rowCount; ++i) {
+            String field = tableSchema.getFieldName(i);
+            String type = tableSchema.getFieldTypeName(i);
+            int fieldLen = field.length();
+            int typeLen = type.length();
+            int fieldStartIdx = 0, typeStartIdx = 0;
+            while(fieldStartIdx < fieldLen || typeStartIdx < typeLen) {
+                line = new StringBuilder(terminalWidth);
+                line.append(CliConstants.SPACE);
+                int numToWrite = Math.min(fieldColSize, fieldLen - fieldStartIdx);
+                if(numToWrite > 0) {
+                    line.append(field, fieldStartIdx, fieldStartIdx + numToWrite);
+                    fieldStartIdx += numToWrite;
+                }
+                CliUtil.appendTo(line, seperatorPos - 1, CliConstants.SPACE);
+                line.append(SEPERATOR);
+                line.append(CliConstants.SPACE);
+
+                numToWrite = Math.min(typeColSize, typeLen - typeStartIdx);
+                if(numToWrite > 0) {
+                    line.append(type, typeStartIdx, typeStartIdx + numToWrite);
+                    typeStartIdx += numToWrite;
+                }
+
+                if(i % 2 == 0) {
+                    AttributedStringBuilder attrBuilder = new AttributedStringBuilder().style(evenLineStyle);
+                    attrBuilder.append(line.toString());
+                    lines.add(attrBuilder.toAnsi());
+                } else {
+                    AttributedStringBuilder attrBuilder = new AttributedStringBuilder().style(oddLineStyle);
+                    attrBuilder.append(line.toString());
+                    lines.add(attrBuilder.toAnsi());
+                }
+            }
+        }
+
+        // Footer
+        line = new StringBuilder(terminalWidth);
+        CliUtil.appendTo(line, longestLineCharNum - 1, LINE_SEP);
+        lines.add(line.toString());
+        return lines;
     }
 
     private void disableJavaSystemOutAndErr() {
         PrintStream ps = new PrintStream(new NullOutputStream());
         System.setOut(ps);
         System.setErr(ps);
-        System.out.println("Should not see this!");
-        System.err.println("Should not see this!");
     }
 
     private class NullOutputStream extends OutputStream {
