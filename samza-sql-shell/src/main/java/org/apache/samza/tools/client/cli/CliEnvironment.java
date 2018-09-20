@@ -27,30 +27,33 @@ public class CliEnvironment {
     }
 
     public void load() {
-        File file = new File(m_defaultPersistenceLocation, m_defaultPersistenceFileName);
-        if(!file.exists())
-            return;
-
         try {
-            FileReader fileReader = new FileReader(file);
-            BufferedReader bufferedReader = new BufferedReader(fileReader);
-            String line = null;
-            while((line = bufferedReader.readLine()) != null) {
-                if(line.startsWith("#"))
-                    continue;
-                String[] strs = line.split("=");
-                if(strs.length != 2)
-                    continue;
-                setEnvironmentVariable(strs[0], strs[1]);
-            }
-            bufferedReader.close();
-        } catch (FileNotFoundException e) {
-            return;
-        } catch (IOException e) {
-            return;
-        }
+            File file = new File(m_defaultPersistenceLocation, m_defaultPersistenceFileName);
+            if (!file.exists())
+                return;
 
-        setupEnvironment();
+            try {
+                FileReader fileReader = new FileReader(file);
+                BufferedReader bufferedReader = new BufferedReader(fileReader);
+                String line = null;
+                while ((line = bufferedReader.readLine()) != null) {
+                    if (line.startsWith("#"))
+                        continue;
+                    String[] strs = line.split("=");
+                    if (strs.length != 2)
+                        continue;
+                    setEnvironmentVariable(strs[0], strs[1]);
+                }
+                bufferedReader.close();
+            } catch (FileNotFoundException e) {
+                return;
+            } catch (IOException e) {
+                return;
+            }
+        }
+        finally {
+            setupEnvironment();
+        }
     }
 
     public ExecutionContext.MessageFormat getMessageFormat() {

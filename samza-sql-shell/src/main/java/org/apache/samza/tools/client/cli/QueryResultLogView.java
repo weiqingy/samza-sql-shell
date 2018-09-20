@@ -34,8 +34,6 @@ public class QueryResultLogView implements CliView {
     private int m_refreshInterval = DEFAULT_REFRESH_INTERVAL;
     private int m_width;
     private int m_height;
-    private CliShell m_shell;
-    private QueryResult m_queryResult;
     private Terminal  m_terminal;
     private SqlExecutor m_executor;
     private ExecutionContext m_exeContext;
@@ -48,14 +46,11 @@ public class QueryResultLogView implements CliView {
     private BindingReader m_keyReader;
 
     public QueryResultLogView() {
-
     }
 
     // -- implementation of CliView -------------------------------------------
 
     public void open(CliShell shell, QueryResult queryResult) {
-        m_shell = shell;
-        m_queryResult = queryResult;
         m_terminal = shell.getTerminal();
         m_executor = shell.getExecutor();
         m_exeContext = shell.getEnvironment().generateExecutionContext();
@@ -68,7 +63,6 @@ public class QueryResultLogView implements CliView {
             while (m_keepRunning) {
                 try {
                     display();
-
                     if(m_keepRunning)
                         Thread.sleep(m_refreshInterval);
                 } catch (InterruptedException e) {
@@ -76,8 +70,17 @@ public class QueryResultLogView implements CliView {
                 }
             }
 
+            try {
+                m_inputThread.join(1* 1000);
+            } catch (InterruptedException e) {
+            }
         } finally {
             restoreTerminal(prevStatus);
+        }
+        if(m_inputThread.isAlive()) {
+            m_terminal.writer().println("Warning: input thread hang. Have to kill!");
+            m_terminal.writer().flush();
+            m_inputThread.interrupt();
         }
     }
 
@@ -106,13 +109,9 @@ public class QueryResultLogView implements CliView {
             clearStatusBar();
             drawStatusBar(rowsInBuffer);
 
-            if(!m_keepRunning)
+            if(!m_keepRunning || m_paused)
                 return;
-            if(m_paused) {
-                clearStatusBar();
-                drawStatusBar(rowsInBuffer);
-                return;
-            }
+
             rowsInBuffer = m_executor.getRowCount();
         }
     }
@@ -215,13 +214,13 @@ public class QueryResultLogView implements CliView {
         switch (signal) {
             case INT:
             case QUIT:
-//                m_keepRunning = false;
+                m_keepRunning = false;
                 break;
             case TSTP:
-                // Pause
+                m_paused = true;
                 break;
             case CONT:
-                // continue
+                m_paused = false;
                 break;
             case WINCH:
                 updateTerminalSize();
