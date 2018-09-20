@@ -2,14 +2,22 @@ package org.apache.samza.tools.client.cli;
 
 import org.apache.samza.tools.client.interfaces.ExecutionContext;
 
-import java.io.File;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.List;
 
 public class CliEnvironment {
     private String m_defaultPersistenceLocation;
+    private PrintStream m_stdout = System.out;
+    private PrintStream m_stderr = System.err;
 
     private ExecutionContext.MessageFormat m_messageFormat = ExecutionContext.MessageFormat.COMPACT;
     private static final String m_messageFormatEnvVar = "OUTPUT";
+
+    private Boolean m_debug = false;
+    private static final String m_debugEnvVar = "DEBUG";
 
 
     public CliEnvironment() {
@@ -17,6 +25,11 @@ public class CliEnvironment {
         if(m_defaultPersistenceLocation == null || m_defaultPersistenceLocation.isEmpty()) {
             m_defaultPersistenceLocation = System.getProperty("user.dir");
         }
+
+        // We control terminal directly; Forbid any Java System.out and System.err stuff so
+        // any underlying output will not mess up the console
+        if(!m_debug)
+            disableJavaSystemOutAndErr();
     }
 
 
@@ -26,6 +39,14 @@ public class CliEnvironment {
 
     public void setMessageFormat(ExecutionContext.MessageFormat messageFormat) {
         m_messageFormat = messageFormat;
+    }
+
+    public boolean isDebug() {
+        return m_debug;
+    }
+
+    public void setDebug(Boolean debug) {
+        m_debug = debug;
     }
 
     public ExecutionContext generateExecutionContext() {
@@ -55,6 +76,19 @@ public class CliEnvironment {
                 }
                 m_messageFormat = messageFormat;
                 break;
+            case m_debugEnvVar:
+                val = val.toLowerCase();
+                if(val.equals("true")) {
+                    m_debug = true;
+                    enableJavaSystemOutAndErr();
+                }
+                else if(val.equals("false")) {
+                    m_debug = false;
+                    disableJavaSystemOutAndErr();
+                }
+                else
+                    return -2;
+                break;
             default:
                 return -1;
         }
@@ -62,12 +96,58 @@ public class CliEnvironment {
         return 0;
     }
 
+    public List<String> getPossibleValues(String var) {
+        List<String> vals = new ArrayList<>();
+        switch (var.toUpperCase()) {
+            case m_messageFormatEnvVar:
+                for(ExecutionContext.MessageFormat fm : ExecutionContext.MessageFormat.values()) {
+                    vals.add(fm.toString());
+                }
+                return vals;
+            case m_debugEnvVar:
+                vals.add("true");
+                vals.add("false");
+                return vals;
+            default:
+                return null;
+        }
+    }
+
     public void printAll(PrintWriter writer) {
         writer.print(m_messageFormatEnvVar);
         writer.print('=');
         writer.println(m_messageFormat.name());
 
+        writer.print(m_debugEnvVar);
+        writer.print('=');
+        writer.println(m_debug);
+
         writer.println();
         writer.flush();
+    }
+
+    private void disableJavaSystemOutAndErr() {
+        PrintStream ps = new PrintStream(new NullOutputStream());
+        System.setOut(ps);
+        System.setErr(ps);
+
+        System.out.println("System.out.println");
+        System.err.println("System.err.println");
+    }
+
+    private void enableJavaSystemOutAndErr() {
+        System.setOut(m_stdout);
+        System.setErr(m_stderr);
+
+        System.out.println("System.out.println");
+        System.err.println("System.err.println");
+    }
+
+    private class NullOutputStream extends OutputStream {
+        public void close() {}
+        public void flush() {}
+        public void write(byte[] b) {}
+        public void write(byte[] b, int off, int len) {}
+        public void write(int b) {}
     }
 }

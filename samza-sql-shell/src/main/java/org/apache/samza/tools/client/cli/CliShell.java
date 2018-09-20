@@ -5,7 +5,6 @@ import java.util.*;
 
 import org.apache.samza.SamzaException;
 import org.apache.samza.tools.client.impl.SamzaExecutor;
-import org.apache.samza.tools.client.impl.UdfDisplayInfo;
 import org.apache.samza.tools.client.interfaces.*;
 import org.apache.samza.tools.client.util.CliException;
 import org.apache.samza.tools.client.util.CliUtil;
@@ -31,7 +30,6 @@ class CliShell {
     private final SqlExecutor m_executor;
     private CliEnvironment m_env;
     private Map<Integer, String> m_executions = new HashMap<>();
-
     private boolean m_keepRunning = true;
 
     public CliShell() {
@@ -91,10 +89,6 @@ class CliShell {
         // Remember we cannot enter alternate screen mode here as there is only one alternate
         // screen and we need it to show streaming results. Clear the screen instead.
         clearScreen();
-
-        // We control terminal directly; Forbid any Java System.out and System.err stuff so
-        // any underlying output will not mess up the console
-        disableJavaSystemOutAndErr();
         m_writer.write(CliConstants.WELCOME_MESSAGE);
 
         try {
@@ -250,6 +244,13 @@ class CliShell {
         } else if(ret == -2){
             m_writer.print("Invalid value: ");
             m_writer.println(params[1]);
+            List<String> vals = m_env.getPossibleValues(params[0]);
+            m_writer.print("Possible values:");
+            for(String s : vals) {
+                m_writer.print(CliConstants.SPACE);
+                m_writer.print(s);
+            }
+            m_writer.println();
         }
 
         m_writer.println();
@@ -606,20 +607,6 @@ class CliShell {
         CliUtil.appendTo(line, longestLineCharNum - 1, LINE_SEP);
         lines.add(line.toString());
         return lines;
-    }
-
-    private void disableJavaSystemOutAndErr() {
-        PrintStream ps = new PrintStream(new NullOutputStream());
-        System.setOut(ps);
-        System.setErr(ps);
-    }
-
-    private class NullOutputStream extends OutputStream {
-        public void close() {}
-        public void flush() {}
-        public void write(byte[] b) {}
-        public void write(byte[] b, int off, int len) {}
-        public void write(int b) {}
     }
 
     // TODO: REMOVE
