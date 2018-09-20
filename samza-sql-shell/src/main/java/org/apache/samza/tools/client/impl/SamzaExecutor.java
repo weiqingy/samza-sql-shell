@@ -327,7 +327,7 @@ public class SamzaExecutor implements SqlExecutor {
         for (Schema.Field field : fields) {
             schemaBuilder.addField(field.name(), getColumnTypeName(getFieldType(field.schema())));
         }
-        return schemaBuilder.toTableSchema();
+        return schemaBuilder.toSchema();
     }
 
     private SamzaSqlFieldType getFieldType(org.apache.avro.Schema schema) {

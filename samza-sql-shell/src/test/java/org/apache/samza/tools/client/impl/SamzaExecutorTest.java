@@ -20,7 +20,7 @@ public class SamzaExecutorTest {
     public void testQueryResult() {
         String sql = "select * from kafka.ProfileChangeStream";
         QueryResult queryResult = m_executor.executeQuery(null, sql);
-        SqlSchema ts = queryResult.getTableSchema();
+        SqlSchema ts = queryResult.getSchema();
 
         Assert.assertEquals("__key__", ts.getFieldName(0));
         Assert.assertEquals("Name", ts.getFieldName(1));

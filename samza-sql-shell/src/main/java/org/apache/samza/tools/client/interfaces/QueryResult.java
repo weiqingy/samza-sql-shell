@@ -16,7 +16,7 @@ public class QueryResult {
         return m_execId;
     }
 
-    public SqlSchema getTableSchema() {
+    public SqlSchema getSchema() {
         return m_schema;
     }
 }

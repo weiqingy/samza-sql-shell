@@ -204,14 +204,14 @@ class CliShell {
             return;
         }
 
-        SqlSchema tableSchema = m_executor.getTableScema(m_env.generateExecutionContext(), parameters);
+        SqlSchema schema = m_executor.getTableScema(m_env.generateExecutionContext(), parameters);
 
-        if(tableSchema == null) {
+        if(schema == null) {
             m_writer.println("Failed to get schema. Error: " + m_executor.getErrorMsg());
         }
         else {
             m_writer.println();
-            List<String> lines = formatSchema4Display(tableSchema);
+            List<String> lines = formatSchema4Display(schema);
             for(String line : lines) {
                 m_writer.println(line);
             }
@@ -509,7 +509,7 @@ class CliShell {
         Field... | VARCHAR(STRING)
         -------------------------
     */
-    private List<String> formatSchema4Display(SqlSchema tableSchema) {
+    private List<String> formatSchema4Display(SqlSchema schema) {
         final String HEADER_FIELD = "Field";
         final String HEADER_TYPE = "Type";
         final char SEPERATOR = '|';
@@ -525,13 +525,13 @@ class CliShell {
         int seperatorPos = HEADER_FIELD.length() + 2;
         int minRowNeeded = Integer.MAX_VALUE;
         int longestLineCharNum = 0;
-        int rowCount = tableSchema.getFieldCount();
+        int rowCount = schema.getFieldCount();
         for(int j = seperatorPos; j < terminalWidth - HEADER_TYPE.length() - 2; ++j) {
             boolean fieldWrapped = false;
             int rowNeeded = 0;
             for (int i = 0; i < rowCount; ++i) {
-                int fieldLen = tableSchema.getFieldName(i).length();
-                int typeLen = tableSchema.getFieldTypeName(i).length();
+                int fieldLen = schema.getFieldName(i).length();
+                int typeLen = schema.getFieldTypeName(i).length();
                 int fieldRowNeeded = CliUtil.ceilingDiv(fieldLen, j - 2);
                 int typeRowNeeded = CliUtil.ceilingDiv(typeLen, terminalWidth - 1 - j - 2);
 
@@ -574,8 +574,8 @@ class CliShell {
         final int fieldColSize = seperatorPos - 2;
         final int typeColSize = terminalWidth - seperatorPos - 1 - 2;
         for (int i = 0; i < rowCount; ++i) {
-            String field = tableSchema.getFieldName(i);
-            String type = tableSchema.getFieldTypeName(i);
+            String field = schema.getFieldName(i);
+            String type = schema.getFieldTypeName(i);
             int fieldLen = field.length();
             int typeLen = type.length();
             int fieldStartIdx = 0, typeStartIdx = 0;

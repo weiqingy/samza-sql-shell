@@ -35,7 +35,7 @@ public class SqlSchemaBuilder {
         return this;
     }
 
-    public SqlSchema toTableSchema() {
+    public SqlSchema toSchema() {
         return new SqlSchema(m_names, m_typeName);
     }
 }
