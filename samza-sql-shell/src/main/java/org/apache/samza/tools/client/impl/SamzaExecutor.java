@@ -2,7 +2,6 @@ package org.apache.samza.tools.client.impl;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -44,7 +43,6 @@ import org.apache.samza.sql.testutil.JsonUtil;
 import org.apache.samza.sql.testutil.ReflectionUtils;
 import org.apache.samza.standalone.PassthroughJobCoordinatorFactory;
 import org.apache.samza.system.OutgoingMessageEnvelope;
-import org.apache.samza.system.eventhub.EventHubSystemFactory;
 import org.apache.samza.system.kafka.KafkaSystemFactory;
 import org.apache.samza.tools.avro.AvroSchemaGenRelConverterFactory;
 import org.apache.samza.tools.avro.AvroSerDeFactory;
@@ -65,7 +63,6 @@ import static org.apache.samza.tools.client.util.CliUtil.*;
 public class SamzaExecutor implements SqlExecutor {
     private static final Logger LOG = LoggerFactory.getLogger(SamzaExecutor.class);
     private static final String SAMZA_SYSTEM_KAFKA = "kafka";
-    private static final String SAMZA_SYSTEM_EVENTHUBS = "eventhub";
     private static final String SAMZA_SYSTEM_LOG = "log";
     private static final int RANDOM_ACCESS_QUEUE_CAPACITY = 5000;
 
@@ -94,11 +91,12 @@ public class SamzaExecutor implements SqlExecutor {
             }
         }
     }
+
     private static AtomicInteger m_execIdSeq = new AtomicInteger(0);
-    private ConcurrentHashMap<Integer, SamzaExecution> m_executors = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Integer, SamzaExecution> m_executions = new ConcurrentHashMap<>();
     private static RandomAccessQueue<OutgoingMessageEnvelope> m_outputData =
         new RandomAccessQueue<>(OutgoingMessageEnvelope.class, RANDOM_ACCESS_QUEUE_CAPACITY);
-    private String m_lastestErrorMsg = "";
+    private String m_lastErrorMsg = "";
 
     // -- implementation of SqlExecutor ------------------------------------------
 
@@ -109,15 +107,19 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public void stop(ExecutionContext context) {
-        for (int execId : m_executors.keySet()) {
-            stopExecution(null, execId);
-            removeExecution(null, execId);
+        for (int execId : m_executions.keySet()) {
+            stopExecution(context, execId);
+            removeExecution(context, execId);
         }
         m_outputData.clear();
     }
 
     @Override
     public List<String> listTables(ExecutionContext context) {
+        /**
+         * TODO: remove hardcode. Currently the Shell can talk to Kafka cluster only, but we should use a general way
+         *       to connect to different systems.
+         */
         String address = "localhost:2181";
         ZkUtils zkUtils = new ZkUtils(new ZkClient(address), new ZkConnection(address), false);
         List<String> tables = JavaConversions.seqAsJavaList(zkUtils.getAllTopics())
@@ -157,7 +159,7 @@ public class SamzaExecutor implements SqlExecutor {
         SamzaSqlApplication app = new SamzaSqlApplication();
         runner.run(app);
 
-        m_executors.put(execId, new SamzaExecution(runner, app));
+        m_executions.put(execId, new SamzaExecution(runner, app));
         LOG.debug("Executing sql. Id ", execId);
 
         return new QueryResult(execId, generateResultSchema(new MapConfig(staticConfigs)), true);
@@ -188,7 +190,7 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public NonQueryResult executeNonQuery(ExecutionContext context, File sqlFile) {
-        m_lastestErrorMsg = "";
+        m_lastErrorMsg = "";
 
         Log.info("Sql file path: " + sqlFile.getPath());
         List<String> executedStmts = new ArrayList<>();
@@ -220,7 +222,7 @@ public class SamzaExecutor implements SqlExecutor {
         SamzaSqlApplication app = new SamzaSqlApplication();
         runner.run(app);
 
-        m_executors.put(execId, new SamzaExecution(runner, app));
+        m_executions.put(execId, new SamzaExecution(runner, app));
         LOG.debug("Executing sql. Id ", execId);
 
         return new NonQueryResult(execId, true);
@@ -228,7 +230,7 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public boolean stopExecution(ExecutionContext context, int exeId) {
-        SamzaExecution exec = m_executors.get(exeId);
+        SamzaExecution exec = m_executions.get(exeId);
         if(exec != null) {
             exec.runner.kill(exec.app);
             m_outputData.clear();
@@ -249,13 +251,13 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public boolean removeExecution(ExecutionContext context, int exeId) {
-        SamzaExecution exec = m_executors.get(exeId);
+        SamzaExecution exec = m_executions.get(exeId);
         if(exec != null) {
             if (exec.getExecutionStatus().equals(ExecutionStatus.Running)) {
                 LOG.error("Trying to remove a ongoing execution ", exeId);
                 return false;
             }
-            m_executors.remove(exeId);
+            m_executions.remove(exeId);
             LOG.debug("Stopping execution ", exeId);
             return true;
         } else {
@@ -266,32 +268,32 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public ExecutionStatus queryExecutionStatus(int execId) {
-        if (!m_executors.containsKey(execId)) {
+        if (!m_executions.containsKey(execId)) {
             return null;
         }
-        return m_executors.get(execId).getExecutionStatus();
+        return m_executions.get(execId).getExecutionStatus();
     }
 
     @Override
     public String getErrorMsg() {
-        return m_lastestErrorMsg;
+        return m_lastErrorMsg;
     }
 
     @Override
     public List<SqlFunction> listFunctions(ExecutionContext m_exeContext) {
+        /**
+         * TODO: currently the Shell only shows some UDFs supported by Samza internally. We may need to require UDFs
+         *       to provide a function of getting their "UdfDisplayInfo", then we can get the UDF information from
+         *       SamzaSqlApplicationConfig.udfResolver(or SamzaSqlApplicationConfig.udfMetadata) instead of registering
+         *       the UDFs one by one as below.
+         */
         List<SqlFunction> udfs = new ArrayList<>();
         udfs.add(new UdfDisplayInfo("RegexMatch", "Matches the string to the regex",
             Arrays.asList(SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING),
                 SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING)),
             SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.BOOLEAN)));
 
-        udfs.add(new UdfDisplayInfo("GetSqlField", "Get ane element from complex field (Array, MAP, ROW)",
-            Arrays.asList(SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.ANY),
-                SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING)),
-            SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.ANY)));
-
         return udfs;
-
     }
 
     static RandomAccessQueue<OutgoingMessageEnvelope> getM_outputData() {
@@ -332,7 +334,6 @@ public class SamzaExecutor implements SqlExecutor {
     }
 
     private SamzaSqlFieldType getFieldType(org.apache.avro.Schema schema) {
-
         switch (schema.getType()) {
             case ARRAY:
                 return SamzaSqlFieldType.createArrayFieldType(getFieldType(schema.getElementType()));
@@ -460,7 +461,7 @@ public class SamzaExecutor implements SqlExecutor {
         staticConfigs.put(configUdfResolverDomain + SamzaSqlApplicationConfig.CFG_FACTORY,
                 ConfigBasedUdfResolver.class.getName());
         staticConfigs.put(configUdfResolverDomain + ConfigBasedUdfResolver.CFG_UDF_CLASSES,
-                Joiner.on(",").join(RegexMatchUdf.class.getName(), FlattenUdf.class.getName(), GetSqlFieldUdf.class.getName()));
+                Joiner.on(",").join(RegexMatchUdf.class.getName(), FlattenUdf.class.getName()));
 
         staticConfigs.put("serializers.registry.string.class", StringSerdeFactory.class.getName());
         staticConfigs.put("serializers.registry.avro.class", AvroSerDeFactory.class.getName());
@@ -480,28 +481,6 @@ public class SamzaExecutor implements SqlExecutor {
 
         staticConfigs.put(avroSamzaSqlConfigPrefix + SqlIOConfig.CFG_SAMZA_REL_CONVERTER, "avro");
         staticConfigs.put(avroSamzaSqlConfigPrefix + SqlIOConfig.CFG_REL_SCHEMA_PROVIDER, "config");
-
-        String ehSystemConfigPrefix =
-            String.format(ConfigBasedIOResolverFactory.CFG_FMT_SAMZA_PREFIX, SAMZA_SYSTEM_EVENTHUBS);
-        String ehSamzaSqlConfigPrefix = configIOResolverDomain + String.format("%s.", SAMZA_SYSTEM_EVENTHUBS);
-        staticConfigs.put(ehSystemConfigPrefix + "samza.factory", EventHubSystemFactory.class.getName());
-        staticConfigs.put(ehSystemConfigPrefix + "stream.list", "teststream1,teststream2");
-        staticConfigs.put("streams.teststream1.eventhubs.namespace", "srinieh1");
-        staticConfigs.put("streams.teststream1.eventhubs.entitypath", "teststream1");
-        staticConfigs.put("sensitive.streams.teststream1.eventhubs.sas.keyname", "WriteKey");
-        staticConfigs.put("sensitive.streams.teststream1.eventhubs.sas.token",
-            "BFMZOHEBLbukDJcuMrx1S9HjxjjUW3feXuuc4fhD7oA=");
-        staticConfigs.put("streams.teststream2.eventhubs.namespace", "srinieh1");
-        staticConfigs.put("streams.teststream2.eventhubs.entitypath", "teststream2");
-        staticConfigs.put("sensitive.streams.teststream2.eventhubs.sas.keyname", "WriteKey");
-        staticConfigs.put("sensitive.streams.teststream2.eventhubs.sas.token",
-            "BFMZOHEBLbukDJcuMrx1S9HjxjjUW3feXuuc4fhD7oA=");
-        staticConfigs.put(ehSystemConfigPrefix + "samza.offset.reset", "true");
-        staticConfigs.put(ehSystemConfigPrefix + "samza.offset.default", "oldest");
-
-
-        staticConfigs.put(ehSamzaSqlConfigPrefix + SqlIOConfig.CFG_SAMZA_REL_CONVERTER, "json");
-        staticConfigs.put(ehSamzaSqlConfigPrefix + SqlIOConfig.CFG_REL_SCHEMA_PROVIDER, "config");
 
         String logSystemConfigPrefix =
                 String.format(ConfigBasedIOResolverFactory.CFG_FMT_SAMZA_PREFIX, SAMZA_SYSTEM_LOG);
