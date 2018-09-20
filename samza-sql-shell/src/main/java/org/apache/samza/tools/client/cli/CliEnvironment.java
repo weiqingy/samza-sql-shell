@@ -168,12 +168,14 @@ public class CliEnvironment {
     }
 
     private void setupEnvironment() {
-        if(!m_debug) {
+        if(m_debug) {
+            enableJavaSystemOutAndErr();
+        }
+        else {
             // We control terminal directly; Forbid any Java System.out and System.err stuff so
             // any underlying output will not mess up the console
             disableJavaSystemOutAndErr();
         }
-        else
-            enableJavaSystemOutAndErr();
+
     }
 }

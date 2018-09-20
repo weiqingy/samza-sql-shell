@@ -1,6 +1,7 @@
 package org.apache.samza.tools.client.interfaces;
 
 
+import java.io.File;
 import java.net.URI;
 import java.util.List;
 import org.apache.samza.tools.client.impl.UdfDisplayInfo;
@@ -89,7 +90,7 @@ public interface SqlExecutor {
      * Executes all the NON-QUERY statements in the sqlFile.
      * Query statements are ignored as it won't make sense.
      */
-    public NonQueryResult executeNonQuery(ExecutionContext context, URI sqlFile);
+    public NonQueryResult executeNonQuery(ExecutionContext context, File file);
 
     /**
      */

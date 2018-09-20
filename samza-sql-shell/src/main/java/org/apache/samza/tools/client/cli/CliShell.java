@@ -273,9 +273,10 @@ class CliShell {
         }
         URI uri = null;
         boolean valid = false;
+        File file = null;
         try {
             uri = new URI(parameters);
-            File file = new File(uri.getPath());
+            file = new File(uri.getPath());
             valid = file.exists();
         } catch (URISyntaxException e) {
         }
@@ -285,7 +286,7 @@ class CliShell {
             return;
         }
 
-        NonQueryResult nonQueryResult = m_executor.executeNonQuery(m_env.generateExecutionContext(), uri);
+        NonQueryResult nonQueryResult = m_executor.executeNonQuery(m_env.generateExecutionContext(), file);
         if(nonQueryResult == null) {
             m_writer.println("Execution error: ");
             m_writer.println(m_executor.getErrorMsg());

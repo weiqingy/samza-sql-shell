@@ -1,5 +1,6 @@
 package org.apache.samza.tools.client.impl;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -159,7 +160,7 @@ public class SamzaExecutor implements SqlExecutor {
         m_executors.put(execId, new SamzaExecution(runner, app));
         LOG.debug("Executing sql. Id ", execId);
 
-        return new QueryResult(execId, generateResultSchema(new MapConfig(staticConfigs)));
+        return new QueryResult(execId, generateResultSchema(new MapConfig(staticConfigs)), true);
     }
 
     @Override
@@ -186,7 +187,7 @@ public class SamzaExecutor implements SqlExecutor {
     }
 
     @Override
-    public NonQueryResult executeNonQuery(ExecutionContext context, URI sqlFile) {
+    public NonQueryResult executeNonQuery(ExecutionContext context, File sqlFile) {
         m_lastestErrorMsg = "";
 
         Log.info("Sql file path: " + sqlFile.getPath());
