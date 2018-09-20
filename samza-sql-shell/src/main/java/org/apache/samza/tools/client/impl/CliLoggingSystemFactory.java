@@ -36,6 +36,7 @@ public class CliLoggingSystemFactory implements SystemFactory {
 
 
     private class LoggingSystemProducer implements SystemProducer {
+
         @Override
         public void start() {
         }
@@ -56,7 +57,7 @@ public class CliLoggingSystemFactory implements SystemFactory {
                     new String((byte[]) envelope.getMessage()));
             LOG.info(msg);
 
-            SamzaExecutor.getM_outputData().add(envelope);
+            SamzaExecutor.saveOutputMessage(envelope);
         }
 
         @Override

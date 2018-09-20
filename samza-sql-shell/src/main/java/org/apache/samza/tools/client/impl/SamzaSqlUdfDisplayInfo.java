@@ -6,7 +6,7 @@ import java.util.stream.Collectors;
 import org.apache.samza.tools.client.interfaces.SqlFunction;
 
 
-public class UdfDisplayInfo implements SqlFunction {
+public class SamzaSqlUdfDisplayInfo implements SqlFunction {
 
   private String name;
 
@@ -16,7 +16,7 @@ public class UdfDisplayInfo implements SqlFunction {
 
   private SamzaSqlFieldType returnType;
 
-  public UdfDisplayInfo(String name, String description, List<SamzaSqlFieldType> argumentTypes,
+  public SamzaSqlUdfDisplayInfo(String name, String description, List<SamzaSqlFieldType> argumentTypes,
       SamzaSqlFieldType returnType) {
     this.name = name;
     this.description = description;

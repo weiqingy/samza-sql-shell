@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
@@ -93,7 +92,7 @@ public class SamzaExecutor implements SqlExecutor {
     }
 
     private static AtomicInteger m_execIdSeq = new AtomicInteger(0);
-    private ConcurrentHashMap<Integer, SamzaExecution> m_executions = new ConcurrentHashMap<>();
+    private Map<Integer, SamzaExecution> m_executions = new HashMap<>();
     private static RandomAccessQueue<OutgoingMessageEnvelope> m_outputData =
         new RandomAccessQueue<>(OutgoingMessageEnvelope.class, RANDOM_ACCESS_QUEUE_CAPACITY);
     private String m_lastErrorMsg = "";
@@ -117,7 +116,7 @@ public class SamzaExecutor implements SqlExecutor {
     @Override
     public List<String> listTables(ExecutionContext context) {
         /**
-         * TODO: remove hardcode. Currently the Shell can talk to Kafka cluster only, but we should use a general way
+         * TODO: remove hardcode. Currently the Shell can only talk to Kafka system, but we should use a general way
          *       to connect to different systems.
          */
         String address = "localhost:2181";
@@ -149,6 +148,7 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public QueryResult executeQuery(ExecutionContext context, String statement) {
+        m_outputData.clear();
         List<String> sqlStmts = formatSqlStmts(Collections.singletonList(statement));
 
         int execId = m_execIdSeq.incrementAndGet();
@@ -220,7 +220,6 @@ public class SamzaExecutor implements SqlExecutor {
 
         SamzaSqlApplicationRunner runner = new SamzaSqlApplicationRunner(true, new MapConfig(staticConfigs));
         SamzaSqlApplication app = new SamzaSqlApplication();
-        runner.run(app);
 
         m_executions.put(execId, new SamzaExecution(runner, app));
         LOG.debug("Executing sql. Id ", execId);
@@ -233,7 +232,6 @@ public class SamzaExecutor implements SqlExecutor {
         SamzaExecution exec = m_executions.get(exeId);
         if(exec != null) {
             exec.runner.kill(exec.app);
-            m_outputData.clear();
             LOG.debug("Stopping execution ", exeId);
 
             try {
@@ -283,12 +281,12 @@ public class SamzaExecutor implements SqlExecutor {
     public List<SqlFunction> listFunctions(ExecutionContext m_exeContext) {
         /**
          * TODO: currently the Shell only shows some UDFs supported by Samza internally. We may need to require UDFs
-         *       to provide a function of getting their "UdfDisplayInfo", then we can get the UDF information from
+         *       to provide a function of getting their "SamzaSqlUdfDisplayInfo", then we can get the UDF information from
          *       SamzaSqlApplicationConfig.udfResolver(or SamzaSqlApplicationConfig.udfMetadata) instead of registering
-         *       the UDFs one by one as below.
+         *       UDFs one by one as below.
          */
         List<SqlFunction> udfs = new ArrayList<>();
-        udfs.add(new UdfDisplayInfo("RegexMatch", "Matches the string to the regex",
+        udfs.add(new SamzaSqlUdfDisplayInfo("RegexMatch", "Matches the string to the regex",
             Arrays.asList(SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING),
                 SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.STRING)),
             SamzaSqlFieldType.createPrimitiveFieldType(SamzaSqlFieldType.TypeName.BOOLEAN)));
@@ -296,12 +294,9 @@ public class SamzaExecutor implements SqlExecutor {
         return udfs;
     }
 
-    static RandomAccessQueue<OutgoingMessageEnvelope> getM_outputData() {
-        return m_outputData;
+    static void saveOutputMessage(OutgoingMessageEnvelope messageEnvelope) {
+        m_outputData.add(messageEnvelope);
     }
-
-
-    // -- private functions ------------------------------------------
 
     private String getColumnTypeName(SamzaSqlFieldType fieldType) {
         if (fieldType.isPrimitiveField()) {

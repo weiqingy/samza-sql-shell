@@ -2,9 +2,7 @@ package org.apache.samza.tools.client.interfaces;
 
 
 import java.io.File;
-import java.net.URI;
 import java.util.List;
-import org.apache.samza.tools.client.impl.UdfDisplayInfo;
 
 
 /**
