@@ -81,8 +81,8 @@ public interface SqlExecutor {
      * All the data before endRow (inclusive) will be deleted.
      * @return available data between startRow and endRow (both are inclusive)
      */
-    // For loging view mode. Still not sure what the interface should be like.
-    // Don't support thie method for now.
+    // For logging view mode. Still not sure what the interface should be like.
+    // Don't support this method for now.
     public List<String[]> consumeQueryResult(ExecutionContext context, int startRow, int endRow);
 
     /**

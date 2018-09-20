@@ -168,7 +168,7 @@ public class QueryResultLogView implements CliView {
         newAttributes.setControlChar(Attributes.ControlChar.VINTR, 0);
         // (034, FS, Ctrl-\) Quit character (QUIT).  Send SIGQUIT signal.
         // Recognized when ISIG is set, and then not passed as input.
-//        newAttributes.setControlChar(Attributes.ControlChar.VQUIT, 0);
+        // newAttributes.setControlChar(Attributes.ControlChar.VQUIT, 0);
         newAttributes.setControlChar(Attributes.ControlChar.VMIN, 1);
         newAttributes.setControlChar(Attributes.ControlChar.VTIME, 0);
         // Enables signals and SIGTTOU signal to the process group of a background

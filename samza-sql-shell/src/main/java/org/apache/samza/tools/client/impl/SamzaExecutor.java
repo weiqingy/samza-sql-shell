@@ -123,10 +123,6 @@ public class SamzaExecutor implements SqlExecutor {
             .stream()
             .map(x -> SAMZA_SYSTEM_KAFKA + "." + x)
             .collect(Collectors.toList());
-
-        tables.add(SAMZA_SYSTEM_EVENTHUBS + "." + "teststream1");
-        tables.add(SAMZA_SYSTEM_EVENTHUBS + "." + "teststream2");
-
         return tables;
     }
 

@@ -3,7 +3,6 @@ package org.apache.samza.tools.client.impl;
 import com.google.common.base.Joiner;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.samza.tools.client.impl.SamzaSqlFieldType;
 import org.apache.samza.tools.client.interfaces.SqlFunction;
 
 
