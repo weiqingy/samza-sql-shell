@@ -2,16 +2,15 @@ package org.apache.samza.tools.client.cli;
 
 import org.apache.samza.tools.client.interfaces.ExecutionContext;
 
-import java.io.OutputStream;
-import java.io.PrintStream;
-import java.io.PrintWriter;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class CliEnvironment {
     private String m_defaultPersistenceLocation;
-    private PrintStream m_stdout = System.out;
-    private PrintStream m_stderr = System.err;
+    private String m_defaultPersistenceFileName = ".samzasqlshellrc";
+    private static PrintStream m_stdout = System.out;
+    private static PrintStream m_stderr = System.err;
 
     private ExecutionContext.MessageFormat m_messageFormat = ExecutionContext.MessageFormat.COMPACT;
     private static final String m_messageFormatEnvVar = "OUTPUT";
@@ -25,13 +24,34 @@ public class CliEnvironment {
         if(m_defaultPersistenceLocation == null || m_defaultPersistenceLocation.isEmpty()) {
             m_defaultPersistenceLocation = System.getProperty("user.dir");
         }
-
-        // We control terminal directly; Forbid any Java System.out and System.err stuff so
-        // any underlying output will not mess up the console
-        if(!m_debug)
-            disableJavaSystemOutAndErr();
     }
 
+    public void load() {
+        File file = new File(m_defaultPersistenceLocation, m_defaultPersistenceFileName);
+        if(!file.exists())
+            return;
+
+        try {
+            FileReader fileReader = new FileReader(file);
+            BufferedReader bufferedReader = new BufferedReader(fileReader);
+            String line = null;
+            while((line = bufferedReader.readLine()) != null) {
+                if(line.startsWith("#"))
+                    continue;
+                String[] strs = line.split("=");
+                if(strs.length != 2)
+                    continue;
+                setEnvironmentVariable(strs[0], strs[1]);
+            }
+            bufferedReader.close();
+        } catch (FileNotFoundException e) {
+            return;
+        } catch (IOException e) {
+            return;
+        }
+
+        setupEnvironment();
+    }
 
     public ExecutionContext.MessageFormat getMessageFormat() {
         return m_messageFormat;
@@ -113,34 +133,27 @@ public class CliEnvironment {
         }
     }
 
-    public void printAll(PrintWriter writer) {
-        writer.print(m_messageFormatEnvVar);
-        writer.print('=');
-        writer.println(m_messageFormat.name());
+    public void printAll(Writer writer) throws IOException {
+        writer.write(m_messageFormatEnvVar);
+        writer.write('=');
+        writer.write(m_messageFormat.name());
+        writer.write('\n');
 
-        writer.print(m_debugEnvVar);
-        writer.print('=');
-        writer.println(m_debug);
-
-        writer.println();
-        writer.flush();
+        writer.write(m_debugEnvVar);
+        writer.write('=');
+        writer.write(m_debug.toString());
+        writer.write('\n');
     }
 
     private void disableJavaSystemOutAndErr() {
         PrintStream ps = new PrintStream(new NullOutputStream());
         System.setOut(ps);
         System.setErr(ps);
-
-        System.out.println("System.out.println");
-        System.err.println("System.err.println");
     }
 
     private void enableJavaSystemOutAndErr() {
         System.setOut(m_stdout);
         System.setErr(m_stderr);
-
-        System.out.println("System.out.println");
-        System.err.println("System.err.println");
     }
 
     private class NullOutputStream extends OutputStream {
@@ -149,5 +162,15 @@ public class CliEnvironment {
         public void write(byte[] b) {}
         public void write(byte[] b, int off, int len) {}
         public void write(int b) {}
+    }
+
+    private void setupEnvironment() {
+        if(!m_debug) {
+            // We control terminal directly; Forbid any Java System.out and System.err stuff so
+            // any underlying output will not mess up the console
+            disableJavaSystemOutAndErr();
+        }
+        else
+            enableJavaSystemOutAndErr();
     }
 }

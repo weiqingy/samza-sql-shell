@@ -66,6 +66,7 @@ class CliShell {
 
         // Execution context and executor
         m_env = new CliEnvironment();
+        m_env.load();
         m_executor = new SamzaExecutor();
         m_executor.start(m_env.generateExecutionContext());
     }
@@ -222,7 +223,13 @@ class CliShell {
     private void commandSet(CliCommand command) {
         String param = command.getParameters();
         if(CliUtil.isNullOrEmpty(param)) {
-            m_env.printAll(m_writer);
+            try {
+                m_env.printAll(m_writer);
+            } catch (IOException e) {
+                e.printStackTrace(m_writer);
+            }
+            m_writer.println();
+            m_writer.flush();
             return;
         }
         String[] params = param.split("=");
