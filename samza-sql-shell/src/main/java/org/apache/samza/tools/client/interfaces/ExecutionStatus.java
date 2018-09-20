@@ -5,5 +5,5 @@ public enum ExecutionStatus {
     New,
     Running,
     SuccessfulFinish,
-    UnsuccessfulFinish
+    UnsuccessfulFinish,
 }

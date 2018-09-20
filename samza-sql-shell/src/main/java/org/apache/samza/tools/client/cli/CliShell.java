@@ -3,7 +3,6 @@ package org.apache.samza.tools.client.cli;
 import java.io.*;
 import java.util.*;
 
-import org.apache.samza.SamzaException;
 import org.apache.samza.tools.client.impl.SamzaExecutor;
 import org.apache.samza.tools.client.interfaces.*;
 import org.apache.samza.tools.client.util.CliException;
@@ -30,6 +29,7 @@ class CliShell {
     private final SqlExecutor m_executor;
     private CliEnvironment m_env;
     private boolean m_keepRunning = true;
+    private Map<Integer, String> m_executions = new TreeMap<>();
 
     public CliShell() {
         // Terminal
@@ -128,13 +128,25 @@ class CliShell {
                             commandExecuteFile(command);
                             break;
 
+                        case EXIT:
+                        case QUIT:
+                            commandQuit();
+                            break;
+
+                        case HELP:
+                            commandHelp(command);
+                            break;
+
                         case INSERT_INTO:
                             commandInsertInto(command);
                             break;
 
-                        case QUIT:
-                        case EXIT:
-                            commandQuit();
+                        case LS:
+                            commandLs(command);
+                            break;
+
+                        case RM:
+                            commandRm(command);
                             break;
 
                         case SELECT:
@@ -145,16 +157,16 @@ class CliShell {
                             commandSet(command);
                             break;
 
-                        case SHOW_TABLES:
-                            commandShowTables(command);
-                            break;
-
                         case SHOW_FUNCTIONS:
                             commandShowFunctions(command);
                             break;
 
-                        case HELP:
-                            commandHelp(command);
+                        case SHOW_TABLES:
+                            commandShowTables(command);
+                            break;
+
+                        case STOP:
+                            commandStop(command);
                             break;
 
                         case INVALID_COMMAND:
@@ -265,8 +277,9 @@ class CliShell {
     }
 
     private  void commandExecuteFile(CliCommand command) {
+        String fullCmdStr = command.getFullCommand();
         String parameters = command.getParameters();
-        if (parameters == null || parameters.isEmpty()) {
+        if (CliUtil.isNullOrEmpty(parameters)) {
             m_writer.println("Usage: execute <fileuri>\n");
             m_writer.flush();
             return;
@@ -295,6 +308,7 @@ class CliShell {
             return;
         }
 
+        m_executions.put(nonQueryResult.getExecutionId(), fullCmdStr);
         List<String> submittedStmts = nonQueryResult.getSubmittedStmts();
         List<String> nonsubmittedStmts = nonQueryResult.getNonSubmittedStmts();
 
@@ -325,17 +339,156 @@ class CliShell {
     }
 
     private void commandInsertInto(CliCommand command) {
+        String fullCmdStr = command.getFullCommand();
         NonQueryResult result = m_executor.executeNonQuery(m_env.generateExecutionContext(),
-                Collections.singletonList(command.getFullCommand()));
+                Collections.singletonList(fullCmdStr));
 
         if (result.succeeded()) {
             m_writer.print("Execution submitted successfully. Id: ");
             m_writer.println(String.valueOf(result.getExecutionId()));
+            m_executions.put(result.getExecutionId(), fullCmdStr);
         } else {
             m_writer.write("Execution failed to submit. Error: ");
             m_writer.println(m_executor.getErrorMsg());
         }
 
+        m_writer.println();
+        m_writer.flush();
+    }
+
+    private void commandLs(CliCommand command) {
+        List<Integer> execIds = new ArrayList<>();
+        String parameters = command.getParameters();
+        if (CliUtil.isNullOrEmpty(parameters)) {
+            execIds.addAll(m_executions.keySet());
+        } else {
+            String[] params = parameters.split("\u0020");
+            for(String param : params) {
+                try {
+                    // Stupid Java doesn't have a tryparse to avoid an exception?
+                    Integer id = Integer.valueOf(param);
+                    execIds.add(id);
+                }
+                catch (NumberFormatException e) {
+                }
+            }
+        }
+        if(execIds.size() == 0) {
+            m_writer.println();
+            return;
+        }
+
+        execIds.sort(Integer::compareTo);
+
+        final int terminalWidth = m_terminal.getWidth();
+        final int ID_WIDTH = 3;
+        final int STATUS_WIDTH = 20;
+        final int CMD_WIDTH = terminalWidth - ID_WIDTH - STATUS_WIDTH - 4;
+
+        AttributedStyle oddLineStyle = AttributedStyle.DEFAULT.BOLD.foreground(AttributedStyle.BLUE);
+        AttributedStyle evenLineStyle = AttributedStyle.DEFAULT.BOLD.foreground(AttributedStyle.CYAN);
+        for(int i = 0; i < execIds.size(); ++i) {
+            Integer id = execIds.get(i);
+            String cmd = m_executions.get(id);
+            if(cmd == null)
+                continue;
+
+            String status = "UNKNOWN";
+            try {
+                ExecutionStatus execStatus = m_executor.queryExecutionStatus(id);
+                if(execStatus != null)
+                    status = execStatus.name();
+            }
+            catch (ExecutionException e) {
+            }
+
+            int cmdStartIdx = 0;
+            int cmdLength = cmd.length();
+            StringBuilder line;
+            while(cmdStartIdx < cmdLength) {
+                line = new StringBuilder(terminalWidth);
+                if(cmdStartIdx == 0) {
+                    line.append(CliConstants.SPACE);
+                    line.append(id);
+                    CliUtil.appendTo(line, 1 + ID_WIDTH + 1, CliConstants.SPACE);
+                    line.append(status);
+                }
+                CliUtil.appendTo(line, 1 + ID_WIDTH + 1 + STATUS_WIDTH + 1, CliConstants.SPACE);
+
+                int numToWrite = Math.min(CMD_WIDTH, cmdLength - cmdStartIdx);
+                if(numToWrite > 0) {
+                    line.append(cmd, cmdStartIdx, cmdStartIdx + numToWrite);
+                    cmdStartIdx += numToWrite;
+                }
+
+                if(i % 2 == 0) {
+                    AttributedStringBuilder attrBuilder = new AttributedStringBuilder().style(evenLineStyle);
+                    attrBuilder.append(line.toString());
+                    m_writer.println(attrBuilder.toAnsi());
+                } else {
+                    AttributedStringBuilder attrBuilder = new AttributedStringBuilder().style(oddLineStyle);
+                    attrBuilder.append(line.toString());
+                    m_writer.println(attrBuilder.toAnsi());
+                }
+            }
+        }
+        m_writer.println();
+        m_writer.flush();
+    }
+
+    private void commandRm(CliCommand command) {
+        String parameters = command.getParameters();
+        if (CliUtil.isNullOrEmpty(parameters)) {
+            m_writer.println(command.getCommandType().getUsage());
+            m_writer.println();
+            m_writer.flush();
+            return;
+        }
+
+        List<Integer> execIds = new ArrayList<>();
+        String[] params = parameters.split("\u0020");
+        for(String param : params) {
+            Integer id = null;
+            try {
+                // Stupid Java doesn't have a tryparse to avoid an exception?
+                id = Integer.valueOf(param);
+                execIds.add(id);
+            }
+            catch (NumberFormatException e) {
+            }
+            if(id == null || !m_executions.containsKey(id)) {
+                m_writer.print("Error: ");
+                m_writer.print(param);
+                m_writer.println(" is not a valid id.");
+            }
+        }
+
+        ExecutionContext exeContext = m_env.generateExecutionContext();
+        for(Integer id : execIds) {
+            ExecutionStatus status = null;
+            try {
+                status = m_executor.queryExecutionStatus(id);
+            }
+            catch (ExecutionException e) {
+            }
+            if(status == null) {
+                m_writer.println(String.format("Error: failed to get execution status for %d. %s",
+                        id, m_executor.getErrorMsg()));
+                continue;
+            }
+            if(status == ExecutionStatus.Running) {
+                m_writer.println(String.format("Execution %d is still running. Stop it first.", id));
+                continue;
+            }
+            if(m_executor.removeExecution(exeContext, id)) {
+                m_writer.println(String.format("Execution %d was removed.", id));
+                m_executions.remove(id);
+            } else {
+                m_writer.println(String.format("Error: failed to remove execution %d. %s",
+                        id, m_executor.getErrorMsg()));
+            }
+
+        }
         m_writer.println();
         m_writer.flush();
     }
@@ -390,9 +543,49 @@ class CliShell {
         m_writer.flush();
     }
 
+    private void commandStop(CliCommand command) {
+        String parameters = command.getParameters();
+        if (CliUtil.isNullOrEmpty(parameters)) {
+            m_writer.println(command.getCommandType().getUsage());
+            m_writer.println();
+            m_writer.flush();
+            return;
+        }
+
+        List<Integer> execIds = new ArrayList<>();
+        String[] params = parameters.split("\u0020");
+        for(String param : params) {
+            Integer id = null;
+            try {
+                // Stupid Java doesn't have a tryparse to avoid an exception?
+                id = Integer.valueOf(param);
+                execIds.add(id);
+            }
+            catch (NumberFormatException e) {
+            }
+            if(id == null || !m_executions.containsKey(id)) {
+                m_writer.print("Error: ");
+                m_writer.print(param);
+                m_writer.println(" is not a valid id.");
+            }
+        }
+
+        ExecutionContext exeContext = m_env.generateExecutionContext();
+        for(Integer id : execIds) {
+            if(m_executor.stopExecution(exeContext, id)) {
+                m_writer.println(String.format("Request to stop execution %d was sent.", id));
+            }
+            else {
+                m_writer.println(String.format("Failed to stop %d: %s", id, m_executor.getErrorMsg()));
+            }
+        }
+        m_writer.println();
+        m_writer.flush();
+    }
+
     private void commandHelp(CliCommand command) {
         String parameters = command.getParameters();
-        if(parameters == null || parameters.isEmpty()) {
+        if(CliUtil.isNullOrEmpty(parameters)) {
             printHelpMessage();
             return;
         }
