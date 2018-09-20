@@ -66,7 +66,6 @@ class CliShell {
 
         // Execution context and executor
         m_env = new CliEnvironment();
-        m_env.load();
         m_executor = new SamzaExecutor();
         m_executor.start(m_env.generateExecutionContext());
     }
