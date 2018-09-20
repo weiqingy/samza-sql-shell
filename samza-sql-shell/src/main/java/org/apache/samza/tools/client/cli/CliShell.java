@@ -29,7 +29,6 @@ class CliShell {
     private final String m_1stPrompt;
     private final SqlExecutor m_executor;
     private CliEnvironment m_env;
-    private Map<Integer, String> m_executions = new HashMap<>();
     private boolean m_keepRunning = true;
 
     public CliShell() {
@@ -66,7 +65,6 @@ class CliShell {
 
         // Execution context and executor
         m_env = new CliEnvironment();
-        m_env.load();
         m_executor = new SamzaExecutor();
         m_executor.start(m_env.generateExecutionContext());
     }
@@ -175,6 +173,8 @@ class CliShell {
         }
         catch (Exception e) {
             e.printStackTrace(m_writer);
+            m_writer.println();
+            m_writer.println("We are sorry but SamzaSqlShell has encountered a problem and needs to stop.");
         }
 
         m_writer.write("Cleaning up... ");
@@ -287,7 +287,7 @@ class CliShell {
         }
 
         NonQueryResult nonQueryResult = m_executor.executeNonQuery(m_env.generateExecutionContext(), file);
-        if(nonQueryResult == null) {
+        if(!nonQueryResult.succeeded()) {
             m_writer.println("Execution error: ");
             m_writer.println(m_executor.getErrorMsg());
             m_writer.println();
@@ -325,45 +325,17 @@ class CliShell {
     }
 
     private void commandInsertInto(CliCommand command) {
-        // TODO: Remove the try catch blcok. Executor is not supposed to report error by exceptions
-        try {
-            NonQueryResult result = m_executor.executeNonQuery(m_env.generateExecutionContext(),
-                    Collections.singletonList(command.getFullCommand()));
+        NonQueryResult result = m_executor.executeNonQuery(m_env.generateExecutionContext(),
+                Collections.singletonList(command.getFullCommand()));
 
-            if (result.succeeded()) {
-                m_writer.print("Execution submitted successfully. Id: ");
-                m_writer.println(String.valueOf(result.getExecutionId()));
-//                m_writer.println();
-            } else {
-                m_writer.write("Execution failed to submit. Error: ");
-                m_writer.write(m_executor.getErrorMsg());
-                m_writer.println();
-                m_writer.flush();
-                return;
-            }
-        }
-        catch(Exception e) {
-            m_writer.println("Exception: " + e.getClass().getName());
-            m_writer.println("Execution error: " + e.getMessage());
-            m_writer.println();
-            m_writer.flush();
-            return;
+        if (result.succeeded()) {
+            m_writer.print("Execution submitted successfully. Id: ");
+            m_writer.println(String.valueOf(result.getExecutionId()));
+        } else {
+            m_writer.write("Execution failed to submit. Error: ");
+            m_writer.println(m_executor.getErrorMsg());
         }
 
-        // For Demo; Doesn't allow more operation unless the insert into is cancelled
-        m_insertIntoRunning = true;
-        m_writer.println("Press Ctrl + C to cancel the execution...");
-        m_writer.flush();
-        Terminal.SignalHandler handler_INT = m_terminal.handle(Terminal.Signal.INT, this::handleSignal);
-        while(m_insertIntoRunning) {
-            try {
-                Thread.sleep(50);
-            } catch (InterruptedException e) {
-                break;
-            }
-        }
-        // Restore original Ctrl C handler
-        m_terminal.handle(Terminal.Signal.INT, handler_INT);
         m_writer.println();
         m_writer.flush();
     }
@@ -373,20 +345,18 @@ class CliShell {
     }
 
     private void commandSelect(CliCommand command) {
-        String fullCmd = command.getFullCommand();
         ExecutionContext exeContext = m_env.generateExecutionContext();
-        try {
-            QueryResult queryResult = m_executor.executeQuery(exeContext, command.getFullCommand());
-            m_executions.put(queryResult.getExecutionId(), fullCmd);
+        QueryResult queryResult = m_executor.executeQuery(exeContext, command.getFullCommand());
 
+        if(queryResult.succeeded()) {
             CliView view = new QueryResultLogView();
             view.open(this, queryResult);
             m_executor.stopExecution(exeContext, queryResult.getExecutionId());
-        } catch (SamzaException e) {
-            m_writer.write("Failed to query. Error: ");
-            m_writer.write(e.getMessage());
-            m_writer.write("\n\n");
-            e.printStackTrace();
+        } else {
+            m_writer.write("Execution failed. Error: ");
+            m_writer.println(m_executor.getErrorMsg());
+            m_writer.println();
+            m_writer.flush();
         }
     }
 
@@ -395,15 +365,13 @@ class CliShell {
 
         if(tableNames != null) {
             for(String tableName : tableNames) {
-                m_writer.write(tableName);
-                m_writer.write('\n');
+                m_writer.println(tableName);
             }
-            m_writer.write('\n');
         } else {
-            m_writer.write("Failed to list tables. Error: ");
-            m_writer.write(m_executor.getErrorMsg());
-            m_writer.write("\n\n");
+            m_writer.print("Failed to list tables. Error: ");
+            m_writer.println(m_executor.getErrorMsg());
         }
+        m_writer.println();
         m_writer.flush();
     }
 
@@ -412,17 +380,14 @@ class CliShell {
 
         if(fns != null) {
             for(SqlFunction fn : fns) {
-                m_writer.write(fn.toString());
-                m_writer.write('\n');
+                m_writer.println(fn.toString());
             }
-            m_writer.write('\n');
         } else {
-            m_writer.write("Failed to list functions. Error: ");
-            m_writer.write(m_executor.getErrorMsg());
-            m_writer.write("\n\n");
+            m_writer.print("Failed to list functions. Error: ");
+            m_writer.println(m_executor.getErrorMsg());
         }
+        m_writer.println();
         m_writer.flush();
-
     }
 
     private void commandHelp(CliCommand command) {
@@ -615,16 +580,5 @@ class CliShell {
         CliUtil.appendTo(line, longestLineCharNum - 1, LINE_SEP);
         lines.add(line.toString());
         return lines;
-    }
-
-    // TODO: REMOVE
-    // Hack for demo
-    private volatile boolean m_insertIntoRunning = false;
-    private void handleSignal(Terminal.Signal signal) {
-        switch (signal) {
-            case INT:
-                m_insertIntoRunning = false;
-                break;
-        }
     }
 }

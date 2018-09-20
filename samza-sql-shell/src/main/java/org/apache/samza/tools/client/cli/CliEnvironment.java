@@ -24,35 +24,32 @@ public class CliEnvironment {
         if(m_defaultPersistenceLocation == null || m_defaultPersistenceLocation.isEmpty()) {
             m_defaultPersistenceLocation = System.getProperty("user.dir");
         }
+        load();
+        setupEnvironment();
     }
 
-    public void load() {
-        try {
-            File file = new File(m_defaultPersistenceLocation, m_defaultPersistenceFileName);
-            if (!file.exists())
-                return;
+    private void load() {
+        File file = new File(m_defaultPersistenceLocation, m_defaultPersistenceFileName);
+        if (!file.exists())
+            return;
 
-            try {
-                FileReader fileReader = new FileReader(file);
-                BufferedReader bufferedReader = new BufferedReader(fileReader);
-                String line = null;
-                while ((line = bufferedReader.readLine()) != null) {
-                    if (line.startsWith("#"))
-                        continue;
-                    String[] strs = line.split("=");
-                    if (strs.length != 2)
-                        continue;
-                    setEnvironmentVariable(strs[0], strs[1]);
-                }
-                bufferedReader.close();
-            } catch (FileNotFoundException e) {
-                return;
-            } catch (IOException e) {
-                return;
+        try {
+            FileReader fileReader = new FileReader(file);
+            BufferedReader bufferedReader = new BufferedReader(fileReader);
+            String line = null;
+            while ((line = bufferedReader.readLine()) != null) {
+                if (line.startsWith("#"))
+                    continue;
+                String[] strs = line.split("=");
+                if (strs.length != 2)
+                    continue;
+                setEnvironmentVariable(strs[0], strs[1]);
             }
-        }
-        finally {
-            setupEnvironment();
+            bufferedReader.close();
+        } catch (FileNotFoundException e) {
+            return;
+        } catch (IOException e) {
+            return;
         }
     }
 
