@@ -5,7 +5,6 @@ import java.util.*;
 
 import org.apache.samza.SamzaException;
 import org.apache.samza.tools.client.impl.SamzaExecutor;
-import org.apache.samza.tools.client.impl.UdfDisplayInfo;
 import org.apache.samza.tools.client.interfaces.*;
 import org.apache.samza.tools.client.util.CliException;
 import org.apache.samza.tools.client.util.CliUtil;
@@ -31,7 +30,6 @@ class CliShell {
     private final SqlExecutor m_executor;
     private CliEnvironment m_env;
     private Map<Integer, String> m_executions = new HashMap<>();
-
     private boolean m_keepRunning = true;
 
     public CliShell() {
@@ -68,6 +66,7 @@ class CliShell {
 
         // Execution context and executor
         m_env = new CliEnvironment();
+        m_env.load();
         m_executor = new SamzaExecutor();
         m_executor.start(m_env.generateExecutionContext());
     }
@@ -91,104 +90,105 @@ class CliShell {
         // Remember we cannot enter alternate screen mode here as there is only one alternate
         // screen and we need it to show streaming results. Clear the screen instead.
         clearScreen();
-
-        // We control terminal directly; Forbid any Java System.out and System.err stuff so
-        // any underlying output will not mess up the console
-        disableJavaSystemOutAndErr();
         m_writer.write(CliConstants.WELCOME_MESSAGE);
 
-        // Check if jna.jar exists in class path
         try {
-            ClassLoader.getSystemClassLoader().loadClass("com.sun.jna.NativeLibrary");
-        } catch(ClassNotFoundException e) {
-            // Something's wrong. It could be a dumb terminal if neither jna nor jansi lib is there
-            m_writer.write("Warning: jna.jar does NOT exist. It may lead to a dumb shell or a performance hit.\n");
-        }
-
-        while(m_keepRunning) {
-            String line;
+            // Check if jna.jar exists in class path
             try {
-                line = m_lineReader.readLine(m_1stPrompt);
-            } catch(UserInterruptException e) {
-                continue;
-            } catch(EndOfFileException e) {
-                commandQuit();
-                break;
+                ClassLoader.getSystemClassLoader().loadClass("com.sun.jna.NativeLibrary");
+            } catch (ClassNotFoundException e) {
+                // Something's wrong. It could be a dumb terminal if neither jna nor jansi lib is there
+                m_writer.write("Warning: jna.jar does NOT exist. It may lead to a dumb shell or a performance hit.\n");
             }
 
-            if(!CliUtil.isNullOrEmpty(line)) {
-                CliCommand command = parseLine(line);
-                if(command == null)
+            while (m_keepRunning) {
+                String line;
+                try {
+                    line = m_lineReader.readLine(m_1stPrompt);
+                } catch (UserInterruptException e) {
                     continue;
+                } catch (EndOfFileException e) {
+                    commandQuit();
+                    break;
+                }
 
-                switch (command.getCommandType()) {
-                    case CLEAR:
-                        commandClear();
-                        break;
+                if (!CliUtil.isNullOrEmpty(line)) {
+                    CliCommand command = parseLine(line);
+                    if (command == null)
+                        continue;
 
-                    case DESCRIBE:
-                        commandDescribe(command);
-                        break;
+                    switch (command.getCommandType()) {
+                        case CLEAR:
+                            commandClear();
+                            break;
 
-                    case EXECUTE:
-                        commandExecuteFile(command);
-                        break;
+                        case DESCRIBE:
+                            commandDescribe(command);
+                            break;
 
-                    case INSERT_INTO:
-                        commandInsertInto(command);
-                        break;
+                        case EXECUTE:
+                            commandExecuteFile(command);
+                            break;
 
-                    case QUIT:
-                    case EXIT:
-                        commandQuit();
-                        break;
+                        case INSERT_INTO:
+                            commandInsertInto(command);
+                            break;
 
-                    case SELECT:
-                        commandSelect(command);
-                        break;
+                        case QUIT:
+                        case EXIT:
+                            commandQuit();
+                            break;
 
-                    case SET:
-                        commandSet(command);
-                        break;
+                        case SELECT:
+                            commandSelect(command);
+                            break;
 
-                    case SHOW_TABLES:
-                        commandShowTables(command);
-                        break;
+                        case SET:
+                            commandSet(command);
+                            break;
 
-                    case SHOW_FUNCTIONS:
-                        commandShowFunctions(command);
-                        break;
+                        case SHOW_TABLES:
+                            commandShowTables(command);
+                            break;
 
-                    case HELP:
-                        commandHelp(command);
-                        break;
+                        case SHOW_FUNCTIONS:
+                            commandShowFunctions(command);
+                            break;
 
-                    case INVALID_COMMAND:
-                        printHelpMessage();
-                        break;
+                        case HELP:
+                            commandHelp(command);
+                            break;
 
-                    default:
-                        m_writer.write("UNDER DEVELOPEMENT. Command:" + command.getCommandType() + "\n");
-                        m_writer.write("Parameters:" +
-                                (CliUtil.isNullOrEmpty(command.getParameters()) ? "NULL" : command.getParameters())
-                                + "\n\n");
-                        m_writer.flush();
+                        case INVALID_COMMAND:
+                            printHelpMessage();
+                            break;
+
+                        default:
+                            m_writer.write("UNDER DEVELOPEMENT. Command:" + command.getCommandType() + "\n");
+                            m_writer.write("Parameters:" +
+                                    (CliUtil.isNullOrEmpty(command.getParameters()) ? "NULL" : command.getParameters())
+                                    + "\n\n");
+                            m_writer.flush();
+                    }
                 }
             }
+        }
+        catch (Exception e) {
+            e.printStackTrace(m_writer);
         }
 
         m_writer.write("Cleaning up... ");
         m_writer.flush();
         m_executor.stop(m_env.generateExecutionContext());
 
-        try {
-            m_terminal.close();
-        }  catch (IOException e) {
-            // Doesn't matter
-        }
-
         m_writer.write("Done.\nBye.\n\n");
         m_writer.flush();
+
+        try {
+            m_terminal.close();
+        } catch (IOException e) {
+            // Doesn't matter
+        }
     }
 
     private void commandClear() {
@@ -223,7 +223,13 @@ class CliShell {
     private void commandSet(CliCommand command) {
         String param = command.getParameters();
         if(CliUtil.isNullOrEmpty(param)) {
-            m_env.printAll(m_writer);
+            try {
+                m_env.printAll(m_writer);
+            } catch (IOException e) {
+                e.printStackTrace(m_writer);
+            }
+            m_writer.println();
+            m_writer.flush();
             return;
         }
         String[] params = param.split("=");
@@ -245,6 +251,13 @@ class CliShell {
         } else if(ret == -2){
             m_writer.print("Invalid value: ");
             m_writer.println(params[1]);
+            List<String> vals = m_env.getPossibleValues(params[0]);
+            m_writer.print("Possible values:");
+            for(String s : vals) {
+                m_writer.print(CliConstants.SPACE);
+                m_writer.print(s);
+            }
+            m_writer.println();
         }
 
         m_writer.println();
@@ -272,12 +285,10 @@ class CliShell {
             return;
         }
 
-        NonQueryResult nonQueryResult = null;
-        try {
-            nonQueryResult = m_executor.executeNonQuery(m_env.generateExecutionContext(), uri);
-        } catch (Exception e) {
-            m_writer.println("Execution error: " + e.getMessage());
-            m_writer.println("Exception: " + e.getClass().getName());
+        NonQueryResult nonQueryResult = m_executor.executeNonQuery(m_env.generateExecutionContext(), uri);
+        if(nonQueryResult == null) {
+            m_writer.println("Execution error: ");
+            m_writer.println(m_executor.getErrorMsg());
             m_writer.println();
             m_writer.flush();
             return;
@@ -603,20 +614,6 @@ class CliShell {
         CliUtil.appendTo(line, longestLineCharNum - 1, LINE_SEP);
         lines.add(line.toString());
         return lines;
-    }
-
-    private void disableJavaSystemOutAndErr() {
-        PrintStream ps = new PrintStream(new NullOutputStream());
-        System.setOut(ps);
-        System.setErr(ps);
-    }
-
-    private class NullOutputStream extends OutputStream {
-        public void close() {}
-        public void flush() {}
-        public void write(byte[] b) {}
-        public void write(byte[] b, int off, int len) {}
-        public void write(int b) {}
     }
 
     // TODO: REMOVE
