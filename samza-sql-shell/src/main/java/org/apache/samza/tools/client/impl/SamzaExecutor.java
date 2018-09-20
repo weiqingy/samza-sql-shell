@@ -130,35 +130,49 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public SqlSchema getTableScema(ExecutionContext context, String tableName) {
+        m_lastErrorMsg = "";
         int execId = m_execIdSeq.incrementAndGet();
         Map<String, String> staticConfigs = fetchSamzaSqlConfig(execId);
         Config samzaSqlConfig = new MapConfig(staticConfigs);
-        SqlIOResolver ioResolver = SamzaSqlApplicationConfig.createIOResolver(samzaSqlConfig);
-        SqlIOConfig sourceInfo = ioResolver.fetchSourceInfo(tableName);
-        RelSchemaProvider schemaProvider =
-            initializePlugin("RelSchemaProvider", sourceInfo.getRelSchemaProviderName(), samzaSqlConfig,
-                CFG_FMT_REL_SCHEMA_PROVIDER_DOMAIN,
-                (o, c) -> ((RelSchemaProviderFactory) o).create(sourceInfo.getSystemStream(), c));
-
-        AvroRelSchemaProvider avroSchemaProvider = (AvroRelSchemaProvider) schemaProvider;
-        String schema = avroSchemaProvider.getSchema(sourceInfo.getSystemStream());
-
-        return convertAvroToSamzaSqlSchema(schema);
+        SqlSchema sqlSchema = null;
+        try {
+            SqlIOResolver ioResolver = SamzaSqlApplicationConfig.createIOResolver(samzaSqlConfig);
+            SqlIOConfig sourceInfo = ioResolver.fetchSourceInfo(tableName);
+            RelSchemaProvider schemaProvider =
+                initializePlugin("RelSchemaProvider", sourceInfo.getRelSchemaProviderName(), samzaSqlConfig,
+                    CFG_FMT_REL_SCHEMA_PROVIDER_DOMAIN,
+                    (o, c) -> ((RelSchemaProviderFactory) o).create(sourceInfo.getSystemStream(), c));
+            AvroRelSchemaProvider avroSchemaProvider = (AvroRelSchemaProvider) schemaProvider;
+            String schema = avroSchemaProvider.getSchema(sourceInfo.getSystemStream());
+            sqlSchema = convertAvroToSamzaSqlSchema(schema);
+        } catch (SamzaException ex) {
+            m_lastErrorMsg = ex.toString();
+            LOG.error(m_lastErrorMsg);
+        }
+        return sqlSchema;
     }
 
     @Override
     public QueryResult executeQuery(ExecutionContext context, String statement) {
+        m_lastErrorMsg = "";
         m_outputData.clear();
-        List<String> sqlStmts = formatSqlStmts(Collections.singletonList(statement));
 
         int execId = m_execIdSeq.incrementAndGet();
         Map<String, String> staticConfigs = fetchSamzaSqlConfig(execId);
+        List<String> sqlStmts = formatSqlStmts(Collections.singletonList(statement));
         staticConfigs.put(SamzaSqlApplicationConfig.CFG_SQL_STMTS_JSON, JsonUtil.toJson(sqlStmts));
 
-        SamzaSqlApplicationRunner runner = new SamzaSqlApplicationRunner(true, new MapConfig(staticConfigs));
-        SamzaSqlApplication app = new SamzaSqlApplication();
-        runner.run(app);
-
+        SamzaSqlApplicationRunner runner;
+        SamzaSqlApplication app;
+        try {
+            runner = new SamzaSqlApplicationRunner(true, new MapConfig(staticConfigs));
+            app = new SamzaSqlApplication();
+            runner.run(app);
+        } catch (SamzaException ex) {
+            m_lastErrorMsg = ex.toString();
+            LOG.error(m_lastErrorMsg);
+            return new QueryResult(execId, null, false);
+        }
         m_executions.put(execId, new SamzaExecution(runner, app));
         LOG.debug("Executing sql. Id ", execId);
 
@@ -197,9 +211,9 @@ public class SamzaExecutor implements SqlExecutor {
         try {
             executedStmts = Files.lines(Paths.get(sqlFile.getPath())).collect(Collectors.toList());
         } catch (IOException e) {
-            String msg = String.format("Unable to parse the sql file %s", sqlFile.getPath());
-            LOG.error(msg, e);
-            throw new SamzaException(msg, e);
+            m_lastErrorMsg = String.format("Unable to parse the sql file %s. %s", sqlFile.getPath(), e.toString());
+            LOG.error(m_lastErrorMsg);
+            return new NonQueryResult(-1, false);
         }
         Log.info("Sql statements in Sql file: " + executedStmts.toString());
 
@@ -212,15 +226,23 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public NonQueryResult executeNonQuery(ExecutionContext context, List<String> statement) {
-        statement = formatSqlStmts(statement);
+        m_lastErrorMsg = "";
 
         int execId = m_execIdSeq.incrementAndGet();
         Map<String, String> staticConfigs = fetchSamzaSqlConfig(execId);
-        staticConfigs.put(SamzaSqlApplicationConfig.CFG_SQL_STMTS_JSON, JsonUtil.toJson(statement));
+        staticConfigs.put(SamzaSqlApplicationConfig.CFG_SQL_STMTS_JSON, JsonUtil.toJson(formatSqlStmts(statement)));
 
-        SamzaSqlApplicationRunner runner = new SamzaSqlApplicationRunner(true, new MapConfig(staticConfigs));
-        SamzaSqlApplication app = new SamzaSqlApplication();
-
+        SamzaSqlApplicationRunner runner;
+        SamzaSqlApplication app;
+        try {
+            runner = new SamzaSqlApplicationRunner(true, new MapConfig(staticConfigs));
+            app = new SamzaSqlApplication();
+            runner.run(app);
+        } catch (SamzaException ex) {
+            m_lastErrorMsg = ex.toString();
+            LOG.error(m_lastErrorMsg);
+            return new NonQueryResult(execId, false);
+        }
         m_executions.put(execId, new SamzaExecution(runner, app));
         LOG.debug("Executing sql. Id ", execId);
 
@@ -229,10 +251,19 @@ public class SamzaExecutor implements SqlExecutor {
 
     @Override
     public boolean stopExecution(ExecutionContext context, int exeId) {
+        m_lastErrorMsg = "";
+
         SamzaExecution exec = m_executions.get(exeId);
         if(exec != null) {
-            exec.runner.kill(exec.app);
             LOG.debug("Stopping execution ", exeId);
+
+            try {
+                exec.runner.kill(exec.app);
+            } catch (SamzaException ex) {
+                m_lastErrorMsg = ex.toString();
+                LOG.debug(m_lastErrorMsg);
+                return false;
+            }
 
             try {
                 Thread.sleep(500); // wait for a second
@@ -242,24 +273,29 @@ public class SamzaExecutor implements SqlExecutor {
 
             return true;
         } else {
-            LOG.warn("Trying to stop a non-existing SQL execution ", exeId);
+            m_lastErrorMsg = "Trying to stop a non-existing SQL execution " + exeId;
+            LOG.warn(m_lastErrorMsg);
             return false;
         }
     }
 
     @Override
     public boolean removeExecution(ExecutionContext context, int exeId) {
+        m_lastErrorMsg = "";
+
         SamzaExecution exec = m_executions.get(exeId);
         if(exec != null) {
             if (exec.getExecutionStatus().equals(ExecutionStatus.Running)) {
-                LOG.error("Trying to remove a ongoing execution ", exeId);
+                m_lastErrorMsg = "Trying to remove a ongoing execution " + exeId;
+                LOG.error(m_lastErrorMsg);
                 return false;
             }
             m_executions.remove(exeId);
             LOG.debug("Stopping execution ", exeId);
             return true;
         } else {
-            LOG.warn("Trying to remove a non-existing SQL execution ", exeId);
+            m_lastErrorMsg = "Trying to remove a non-existing SQL execution " + exeId;
+            LOG.warn(m_lastErrorMsg);
             return false;
         }
     }
