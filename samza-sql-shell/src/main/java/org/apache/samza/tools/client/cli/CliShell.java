@@ -184,6 +184,9 @@ class CliShell {
             }
         }
         catch (Exception e) {
+            m_writer.print(e.getClass().getSimpleName());
+            m_writer.print(". ");
+            m_writer.println(e.getMessage());
             e.printStackTrace(m_writer);
             m_writer.println();
             m_writer.println("We are sorry but SamzaSqlShell has encountered a problem and needs to stop.");
